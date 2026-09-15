@@ -175,7 +175,15 @@ class Module extends BaseModule
      */
     public function init(): void
     {
-        Craft::setAlias('@mustasj/craft-mcp', __DIR__);
+        // Aliaset MÅ hete akkurat dette. Yiis `Module::getControllerPath()`
+        // utleder stien fra `controllerNamespace` med
+        // `'@' . str_replace('\\', '/', $ns)` — altså `@Mustasj/CraftMcp/console`,
+        // med store forbokstaver. Et alias med annen skrivemåte teller ikke:
+        // aliaser er case-sensitive. Sto her som `@mustasj/craft-mcp`, og da
+        // krasjet `php craft` — hele kommandolista — med «Invalid path alias»
+        // i ethvert prosjekt som installerte pakken, fordi HelpController
+        // lister kommandoene til hver modul.
+        Craft::setAlias('@Mustasj/CraftMcp', __DIR__);
 
         $this->setComponents([
             'tokens' => Tokens::class,
