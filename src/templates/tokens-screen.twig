@@ -1,0 +1,222 @@
+{# ========================================================================= #}
+{# MCP-tokens — fane på brukersiden                                          #}
+{#                                                                           #}
+{# Viser brukerens API-tokens for MCP-endepunktet, med generering og         #}
+{# tilbaketrekking. Nygenererte tokens vises i klartekst nøyaktig én gang    #}
+{# (via session-flash) — kun hashen lagres.                                  #}
+{# ========================================================================= #}
+
+{% import '_includes/forms.twig' as forms %}
+{% import _self as mcp %}
+
+{% macro codeblock(text) %}
+    <div class="pane mcp-codeblock" tabindex="0">
+        <pre><code>{{- text -}}</code></pre>
+        <button type="button" class="btn small mcp-copy-btn" data-icon="clipboard" title="Kopier til utklippstavle">{{ 'Kopier'|t('app') }}</button>
+    </div>
+{% endmacro %}
+
+{% set tokenPlaceholder = newToken ?? '<token>' %}
+{% set tokenEnvVar = serverSlug|upper|replace({'-': '_'}) ~ '_TOKEN' %}
+{% set mcpPathUrl = mcpUrl|trim('/', 'right') ~ '/t/' ~ tokenPlaceholder %}
+
+{% if newToken %}
+    <div class="pane" style="border-left: 4px solid var(--enabled-color, #27ab83);">
+        <h2>Nytt token generert</h2>
+        <p class="warning with-icon">Kopier tokenet nå — det vises ikke igjen.</p>
+        {% include '_includes/forms/copytext.twig' with {
+            id: 'mcp-new-token',
+            value: newToken,
+            class: 'code fullwidth',
+        } only %}
+        <p class="light">Brukes som <code>Authorization: Bearer &lt;token&gt;</code> mot <code>{{ mcpUrl }}</code>.</p>
+
+        {% if tokenInPath %}
+            <h2 style="margin-top: 18px;">Ferdig URL for Claude Desktop</h2>
+            <p class="light">Skal du bruke «Add custom connector», lim inn denne i stedet — den inneholder tokenet:</p>
+            {% include '_includes/forms/copytext.twig' with {
+                id: 'mcp-new-connector-url',
+                value: mcpPathUrl,
+                class: 'code fullwidth',
+            } only %}
+        {% endif %}
+    </div>
+    <hr>
+{% endif %}
+
+<h2>Koble til en AI-klient</h2>
+{% if not newToken %}
+    <p class="light">Oppskriftene under bruker <code>&lt;token&gt;</code> som plassholder — bytt ut med et av tokenene under, eller generer et nytt.</p>
+{% endif %}
+
+<div class="mcp-connect">
+    <div class="mcp-connect-tabs">
+        {% if tokenInPath %}
+            <button type="button" class="btn small mcp-tab-btn is-active" data-tab="claude-desktop">Claude Desktop</button>
+        {% endif %}
+        <button type="button" class="btn small mcp-tab-btn{{ tokenInPath ? '' : ' is-active' }}" data-tab="claude-code">Claude Code</button>
+        <button type="button" class="btn small mcp-tab-btn" data-tab="codex">Codex CLI</button>
+        <button type="button" class="btn small mcp-tab-btn" data-tab="gemini">Gemini CLI</button>
+        <button type="button" class="btn small mcp-tab-btn" data-tab="claude-desktop-json">Claude Desktop (manuell JSON)</button>
+    </div>
+
+    <div class="mcp-tab-panel" data-panel="claude-code"{{ tokenInPath ? ' hidden'|raw : '' }}>
+        <p class="light">Kjør i terminalen:</p>
+        {% set snippet %}claude mcp add --transport http {{ serverSlug }} {{ mcpUrl }} --header "Authorization: Bearer {{ tokenPlaceholder }}"{% endset %}
+        {{ mcp.codeblock(snippet) }}
+    </div>
+
+    <div class="mcp-tab-panel" data-panel="claude-desktop"{{ tokenInPath ? '' : ' hidden'|raw }}>
+        <p class="light">Ingen config-fil og ingen Node/npx — bare én URL. Kopier denne:</p>
+        {% set snippet %}{{ mcpPathUrl }}{% endset %}
+        {{ mcp.codeblock(snippet) }}
+        <p class="light">Lim den inn i Claude Desktop under <strong>Innstillinger → Connectors → Add custom connector</strong>, med <code>{{ serverName }}</code> som navn. Samme URL virker også i claude.ai og i Claude-appen på mobil.</p>
+        <p class="warning with-icon">Denne URL-en inneholder tokenet ditt — behandle den som et passord. Fordi tokenet ligger i adressen havner det i serverlogger, så bruk et eget token per klient og ikke del URL-en i chat eller e-post.</p>
+        <p class="light">Custom connectors krever Claude Pro, Max, Team eller Enterprise. På gratisplanen: bruk <strong>Claude Desktop (manuell JSON)</strong>.</p>
+    </div>
+
+    <div class="mcp-tab-panel" data-panel="codex" hidden>
+        <p class="light">Legg til i <code>~/.codex/config.toml</code>:</p>
+        {% set snippet %}[mcp_servers.{{ serverSlug }}]
+url = "{{ mcpUrl }}"
+bearer_token_env_var = "{{ tokenEnvVar }}"{% endset %}
+        {{ mcp.codeblock(snippet) }}
+        <p class="light">Sett miljøvariabelen i shell-profilen din:</p>
+        {% set snippet %}export {{ tokenEnvVar }}="{{ tokenPlaceholder }}"{% endset %}
+        {{ mcp.codeblock(snippet) }}
+    </div>
+
+    <div class="mcp-tab-panel" data-panel="gemini" hidden>
+        <p class="light">Legg til i <code>~/.gemini/settings.json</code>:</p>
+        {% set snippet %}{
+  "mcpServers": {
+    "{{ serverSlug }}": {
+      "httpUrl": "{{ mcpUrl }}",
+      "headers": { "Authorization": "Bearer {{ tokenPlaceholder }}" }
+    }
+  }
+}{% endset %}
+        {{ mcp.codeblock(snippet) }}
+    </div>
+
+    <div class="mcp-tab-panel" data-panel="claude-desktop-json" hidden>
+        <p class="light">Alternativet når du ikke har Claude Pro/Max/Team, eller vil holde tokenet ute av URL-en. Krever at Node/npx er installert (<code>npx -v</code> må svare). Legg til i <code>claude_desktop_config.json</code> (Innstillinger → Developer → Edit Config):</p>
+        {% set snippet %}{
+  "mcpServers": {
+    "{{ serverSlug }}": {
+      "command": "npx",
+      "args": ["mcp-remote", "{{ mcpUrl }}", "--header", "Authorization:{{ '${' }}{{ tokenEnvVar }}}"],
+      "env": { "{{ tokenEnvVar }}": "Bearer {{ tokenPlaceholder }}" }
+    }
+  }
+}{% endset %}
+        {{ mcp.codeblock(snippet) }}
+        <p class="light">Start Claude Desktop på nytt etterpå. Merk formen <code>Authorization:{{ '${' }}{{ tokenEnvVar }}}</code> uten mellomrom — Claude Desktop splitter argumenter på mellomrom, derfor settes headeren sammen via miljøvariabelen.</p>
+    </div>
+
+    <p class="light">ChatGPT sine tilpassede connectors krever i dag OAuth i stedet for et enkelt bearer-token, så det er ikke satt opp en oppskrift for det her.</p>
+</div>
+
+<style>
+    .mcp-connect-tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
+    .mcp-tab-btn.is-active { background: var(--gray-200); font-weight: 600; }
+    .mcp-codeblock { position: relative; margin: 0 0 14px; padding: 14px 90px 14px 14px; max-height: 320px; overflow: auto; }
+    .mcp-codeblock pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+    .mcp-codeblock .mcp-copy-btn { position: absolute; top: 10px; right: 10px; }
+</style>
+<script>
+    (function() {
+        var buttons = document.querySelectorAll('.mcp-tab-btn');
+        var panels = document.querySelectorAll('.mcp-tab-panel');
+        buttons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                buttons.forEach(function(b) { b.classList.remove('is-active'); });
+                btn.classList.add('is-active');
+                panels.forEach(function(panel) {
+                    panel.hidden = panel.dataset.panel !== btn.dataset.tab;
+                });
+            });
+        });
+
+        document.querySelectorAll('.mcp-copy-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var code = btn.closest('.mcp-codeblock').querySelector('code').textContent;
+                navigator.clipboard.writeText(code).then(function() {
+                    if (window.Craft && Craft.cp) {
+                        Craft.cp.displayNotice('Kopiert til utklippstavlen.');
+                    }
+                });
+            });
+        });
+    })();
+</script>
+
+<hr>
+
+<h2>Aktive tokens</h2>
+
+{% if tokens is empty %}
+    <p class="zilch small">Ingen tokens ennå.</p>
+{% else %}
+    <table class="data fullwidth">
+        <thead>
+            <tr>
+                <th>Navn</th>
+                <th>Sist brukt</th>
+                <th>Utløper</th>
+                <th>Opprettet</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for token in tokens %}
+                <tr>
+                    <td><code>{{ token.name }}</code></td>
+                    <td>{{ token.lastUsedAt ? token.lastUsedAt|date('short') ~ ' ' ~ token.lastUsedAt|time('short') : '—' }}</td>
+                    <td>{{ token.expiresAt ? token.expiresAt|date('short') : 'aldri' }}</td>
+                    <td>{{ token.dateCreated|date('short') }}</td>
+                    <td class="thin">
+                        <form method="post" accept-charset="UTF-8">
+                            {{ csrfInput() }}
+                            {{ actionInput(moduleId ~ '/tokens/revoke') }}
+                            {{ hiddenInput('userId', user.id) }}
+                            {{ hiddenInput('id', token.id) }}
+                            <button type="submit" class="btn small">Trekk tilbake</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+<hr>
+
+<h2>Generer nytt token</h2>
+
+<form method="post" accept-charset="UTF-8" class="flex flex-nowrap" style="align-items: flex-end;">
+    {{ csrfInput() }}
+    {{ actionInput(moduleId ~ '/tokens/create') }}
+    {{ hiddenInput('userId', user.id) }}
+
+    {{ forms.textField({
+        label: 'Navn',
+        instructions: 'F.eks. hvilken maskin eller klient tokenet skal brukes fra.',
+        id: 'mcp-token-name',
+        name: 'name',
+        value: '',
+        required: true,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Utløper om (dager)',
+        instructions: 'Tomt = utløper aldri.',
+        id: 'mcp-token-expires',
+        name: 'expiresDays',
+        size: 8,
+    }) }}
+
+    <div class="field">
+        <button type="submit" class="btn submit">Generer token</button>
+    </div>
+</form>

@@ -1,0 +1,11 @@
+# Genererte artefakter — utdata committes, metadata gitignoreres
+graphify/.graphify_*
+graphify/cache/
+graphify/cost.json
+graphify/manifest.json
+
+# Overleveringer navngir kundeprosjekter, lokale filstier og planlagt arbeid.
+# Repoet er offentlig (se security-guidelines.md «Distribusjon») — de blir
+# liggende på disk, men committes ikke.
+context/handoffs/*.md
+!context/handoffs/README.md
