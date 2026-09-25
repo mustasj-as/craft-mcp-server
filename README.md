@@ -55,6 +55,7 @@ php craft mcp-api/tokens/create <brukernavn>
 | `routePath` | `mcp` | URL-stien endepunktet svarer på |
 | `tokenInPath` | `true` | Om `/mcp/t/<token>` også registreres |
 | `sites` | — | **Påkrevd.** Språkkode → Craft site-handle |
+| `defaultSite` | `null` | Språkkoden som brukes når `site` utelates. Tomt gir koden for Craft-installasjonens **primære** site — ikke første nøkkel i `sites`, og ikke siteId 1 |
 | `sections` | — | **Påkrevd.** Seksjonshandle → policy |
 | `categoryGroups` | `[]` | Kategorigrupper som eksponeres |
 | `fieldNotes` | `[]` | Felthandle → merknad, for felt der lagret verdi ≠ vist verdi |

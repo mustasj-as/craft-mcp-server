@@ -32,7 +32,7 @@ class WriteTools
     /**
      * @var string Beskrivelse brukt for `fields`-parametrene
      */
-    private const FIELDS_DESCRIPTION = 'Field values keyed by field handle (see get_content_model). Matrix fields: array of blocks [{"type": "<entryTypeHandle>", "title": "...", "fields": {...}}] — replaces the entire field content; include existing block ids as {"id": 123, ...} to keep them, and omit "title" for block types without a title field. Blocks nest: a Matrix field inside a block\'s "fields" takes the same array-of-blocks shape. Category fields: array of slugs. Asset/entry relation fields: array of element ids.';
+    public const FIELDS_DESCRIPTION = 'Field values keyed by field handle (see get_content_model). Matrix fields: array of blocks [{"type": "<entryTypeHandle>", "title": "...", "fields": {...}}] — replaces the entire field content; include existing block ids as {"id": 123, ...} to keep them, and omit "title" for block types without a title field. Blocks nest: a Matrix field inside a block\'s "fields" takes the same array-of-blocks shape. Category fields: array of slugs. Asset/entry relation fields: array of element ids.';
 
     // =========================================================================
     // Public Methods
@@ -44,7 +44,7 @@ class WriteTools
      * @param string $section Seksjon
      * @param string $title Tittel
      * @param array $fields Feltverdier per handle
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @param string|null $slug Ønsket slug (genereres fra tittel hvis utelatt)
      * @param string|null $entryType Entry-type-handle (default: seksjonens første)
      * @param int|null $parentId Forelder i structure-seksjoner (null = toppnivå)
@@ -55,11 +55,13 @@ class WriteTools
         string $section,
         string $title,
         array $fields = [],
-        string $site = 'nb',
+        ?string $site = null,
         ?string $slug = null,
         ?string $entryType = null,
         ?int $parentId = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $user = $this->_requireUser();
         SectionPolicy::assertAllowed($section, SectionPolicy::CREATE);
         $sectionModel = Craft::$app->getEntries()->getSectionByHandle($section);
@@ -100,7 +102,7 @@ class WriteTools
      * @param int $entryId ID-en til entryen som skal endres
      * @param array $fields Feltverdier per handle (kun feltene som skal endres)
      * @param string|null $title Ny tittel
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @param int|null $parentId Ny forelder i structure-seksjoner (0 = flytt til toppnivå)
      * @return array
      * @throws \Throwable
@@ -109,9 +111,11 @@ class WriteTools
         int $entryId,
         array $fields = [],
         ?string $title = null,
-        string $site = 'nb',
+        ?string $site = null,
         ?int $parentId = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $user = $this->_requireUser();
 
         /** @var Entry|null $entry */
@@ -172,14 +176,16 @@ class WriteTools
      * Publiserer et utkast.
      *
      * @param int $draftId Utkast-ID fra create_entry/update_entry
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @return array
      * @throws \Throwable
      */
     public function publishDraft(
         int $draftId,
-        string $site = 'nb',
+        ?string $site = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $user = $this->_requireUser();
 
         /** @var Entry|null $draft */

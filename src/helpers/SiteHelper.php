@@ -41,6 +41,30 @@ class SiteHelper
     }
 
     /**
+     * Returnerer språkkoden verktøyene bruker når `site` utelates.
+     *
+     * `defaultSite` fra konfigurasjonen hvis satt, ellers koden som peker på
+     * Craft-installasjonens primære site. Se {@see Module::$defaultSite} for
+     * hvorfor det ikke er første nøkkel i kartet.
+     *
+     * @return string
+     */
+    public static function defaultKey(): string
+    {
+        $module = Module::getInstance();
+
+        if ($module->defaultSite !== null) {
+            return $module->defaultSite;
+        }
+
+        $primary = array_search(Craft::$app->getSites()->getPrimarySite()->handle, $module->sites, true);
+
+        // Primærsiten er ikke eksponert i `sites` — da finnes det ikke noe
+        // «riktig» svar, og første nøkkel er bedre enn en feil på hvert kall.
+        return $primary !== false ? $primary : (string)array_key_first($module->sites);
+    }
+
+    /**
      * Returnerer Craft-siten for en språkkode.
      *
      * @param string $site Språkkode, f.eks. «nb» eller «en»

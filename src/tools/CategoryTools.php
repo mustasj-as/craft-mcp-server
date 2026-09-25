@@ -21,13 +21,15 @@ class CategoryTools
      * Lister kategoriene i en gruppe.
      *
      * @param string $group Kategorigruppe («hovedkategori», «merke» eller «vanskelighetsgrad»)
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @return array
      */
     public function listCategories(
         string $group,
-        string $site = 'nb',
+        ?string $site = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $categories = Category::find()
             ->group($group)
             ->site(SiteHelper::resolve($site)->handle)

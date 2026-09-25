@@ -4,6 +4,8 @@ namespace Mustasj\CraftMcp\tools;
 
 use Craft;
 use craft\elements\Asset;
+use craft\db\Query;
+use craft\db\Table;
 use craft\elements\User;
 use craft\models\VolumeFolder;
 use Mcp\Exception\ToolCallException;
@@ -48,7 +50,7 @@ class AssetTools
      * @param string $kind Filtype («image», «pdf», «video», «any»)
      * @param bool $missingAlt Kun assets uten alt-tekst
      * @param int $limit Maks antall treff
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @return array
      * @throws ToolCallException ved ukjent mappe
      */
@@ -58,8 +60,10 @@ class AssetTools
         string $kind = 'image',
         bool $missingAlt = false,
         int $limit = 25,
-        string $site = 'nb',
+        ?string $site = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $limit = max(1, min($limit, self::MAX_LIMIT));
         $siteHandle = SiteHelper::resolve($site)->handle;
         $folderModel = $folder !== null ? $this->_resolveFolder($folder) : null;
@@ -118,33 +122,118 @@ class AssetTools
     }
 
     /**
-     * Lister mappene i asset-volumene.
+     * Lister asset-mapper, ett nivå om gangen.
      *
+     * Svaret starter alltid med `summary` — antall mapper og assets per volum,
+     * regnet med én COUNT per volum — slik at klienten ser omfanget før den
+     * graver. Det var hele treet i ett svar før, og ett prosjekt har én mappe
+     * per eiendom: 5 420 mapper, 425 000 tegn, og en COUNT-spørring per mappe.
+     * Nå telles bare mappene som faktisk returneres.
+     *
+     * Uten `parent` og `query` listes volumenes rotmapper. Med `parent` listes
+     * mappens direkte undermapper. Med `query` søkes det på mappenavn i hele
+     * treet (eller under `parent`), fordi en mappe som heter etter en
+     * referanse ellers bare kan finnes ved å bla.
+     *
+     * @param string|null $parent Mappenavn eller -sti å liste undermappene til
+     * @param string|null $query Delstreng av mappenavnet
+     * @param int $limit Maks antall mapper
+     * @param int $offset Antall mapper å hoppe over
      * @return array
+     * @throws ToolCallException ved ukjent mappe
      */
-    public function listAssetFolders(): array
-    {
-        $foldersService = Craft::$app->getAssets();
-        $folders = [];
+    public function listAssetFolders(
+        ?string $parent = null,
+        ?string $query = null,
+        int $limit = 50,
+        int $offset = 0,
+    ): array {
+        $limit = max(1, min($limit, self::MAX_LIMIT));
+        $offset = max(0, $offset);
+        $volumes = Craft::$app->getVolumes()->getAllVolumes();
+        $parentModel = $parent !== null ? $this->_resolveFolder($parent) : null;
 
-        foreach (Craft::$app->getVolumes()->getAllVolumes() as $volume) {
-            $root = $foldersService->getRootFolderByVolumeId($volume->id);
+        $summary = array_map(static fn($volume) => [
+            'volume' => $volume->name,
+            'folders' => (int)(new Query())
+                ->from(Table::VOLUMEFOLDERS)
+                ->where(['volumeId' => $volume->id])
+                ->count(),
+            'assets' => (int)Asset::find()->volumeId($volume->id)->count(),
+        ], $volumes);
 
-            if ($root === null) {
-                continue;
+        $folderQuery = (new Query())
+            ->select(['id', 'parentId', 'volumeId', 'name', 'path'])
+            ->from(Table::VOLUMEFOLDERS)
+            ->where(['volumeId' => array_map(static fn($volume) => $volume->id, $volumes)])
+            ->orderBy(['path' => SORT_ASC, 'name' => SORT_ASC]);
+
+        if ($query !== null && $query !== '') {
+            // Postgres' LIKE skiller store og små bokstaver, MySQLs gjør det
+            // ikke med standard kollasjon — og `ilike` finnes bare i Yiis
+            // Postgres-driver. Pakken kjører på begge.
+            $like = Craft::$app->getDb()->getIsPgsql() ? 'ilike' : 'like';
+            $folderQuery->andWhere([$like, 'name', $query]);
+
+            if ($parentModel !== null) {
+                $folderQuery->andWhere(['volumeId' => $parentModel->volumeId]);
+
+                // Rotmappa har tom sti, og da er hele volumet «under» den.
+                if ($parentModel->path) {
+                    $folderQuery->andWhere(['like', 'path', addcslashes($parentModel->path, '%_\\') . '%', false]);
+                }
             }
-
-            foreach (array_merge([$root], $foldersService->getAllDescendantFolders($root)) as $folder) {
-                $folders[] = [
-                    'name' => $folder->name,
-                    'path' => $folder->path ?: '/',
-                    'volume' => $volume->name,
-                    'assetCount' => (int)Asset::find()->folderId($folder->id)->count(),
-                ];
-            }
+        } elseif ($parentModel !== null) {
+            $folderQuery->andWhere(['parentId' => $parentModel->id]);
+        } else {
+            $folderQuery->andWhere(['parentId' => null]);
         }
 
-        return ['folders' => $folders];
+        $total = (int)(clone $folderQuery)->count();
+        $rows = $folderQuery->limit($limit)->offset($offset)->all();
+        $ids = array_column($rows, 'id');
+
+        // Én gruppert spørring for undermappene, ikke én per rad.
+        $subfolderCounts = $ids === [] ? [] : (new Query())
+            ->select(['parentId', 'count' => 'COUNT(*)'])
+            ->from(Table::VOLUMEFOLDERS)
+            ->where(['parentId' => $ids])
+            ->groupBy('parentId')
+            ->pairs();
+
+        $volumeNames = [];
+
+        foreach ($volumes as $volume) {
+            $volumeNames[$volume->id] = $volume->name;
+        }
+
+        $folders = array_map(static fn(array $row) => [
+            'name' => $row['name'],
+            'path' => $row['path'] ?: '/',
+            'volume' => $volumeNames[$row['volumeId']] ?? null,
+            // Bare assets direkte i mappa — search_assets med `folder` tar
+            // med undermappene.
+            'assetCount' => (int)Asset::find()->folderId($row['id'])->count(),
+            'subfolderCount' => (int)($subfolderCounts[$row['id']] ?? 0),
+        ], $rows);
+
+        $result = [
+            'summary' => $summary,
+            'total' => $total,
+            'returned' => count($folders),
+            'offset' => $offset,
+            'folders' => $folders,
+        ];
+
+        if ($offset + count($folders) < $total) {
+            $result['hint'] = sprintf(
+                'Showing %d of %d folders. Use offset to page, "query" to search by folder name, or "parent" to go one level down.',
+                count($folders),
+                $total,
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -154,7 +243,7 @@ class AssetTools
      * @param string|null $alt Alt-tekst
      * @param string|null $title Tittel
      * @param array $fields Egendefinerte feltverdier per handle
-     * @param string $site Språk («nb» eller «en»)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @return array
      * @throws \Throwable
      */
@@ -163,8 +252,10 @@ class AssetTools
         ?string $alt = null,
         ?string $title = null,
         array $fields = [],
-        string $site = 'nb',
+        ?string $site = null,
     ): array {
+        $site ??= SiteHelper::defaultKey();
+
         $user = Craft::$app->getUser()->getIdentity();
 
         if (!$user instanceof User) {
@@ -254,15 +345,20 @@ class AssetTools
             }
         }
 
-        $names = array_map(
+        // Taket er ikke kosmetisk: ett prosjekt har 5 420 mapper, og hele lista
+        // i en feilmelding blir en feilmelding ingen kan lese.
+        $names = array_values(array_unique(array_map(
             static fn(VolumeFolder $candidate) => $candidate->name,
             $candidates,
-        );
+        )));
+        $shown = array_slice($names, 0, 20);
+        $rest = count($names) - count($shown);
 
         throw new ToolCallException(sprintf(
-            'Unknown asset folder "%s". Available folders: %s. Call list_asset_folders for details.',
+            'Unknown asset folder "%s". Some available folders: %s%s. Call list_asset_folders with "query" to search by name.',
             $folder,
-            implode(', ', array_unique($names)),
+            implode(', ', $shown),
+            $rest > 0 ? sprintf(' (and %d more)', $rest) : '',
         ));
     }
 

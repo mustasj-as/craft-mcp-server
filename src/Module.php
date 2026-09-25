@@ -133,6 +133,17 @@ class Module extends BaseModule
     public array $sites = [];
 
     /**
+     * @var string|null Språkkoden verktøyene bruker når `site` utelates
+     *
+     * Tomt betyr Craft-installasjonens PRIMÆRE site, slått opp i `sites` —
+     * ikke første nøkkel i kartet og ikke siteId 1. Ett prosjekt har engelsk
+     * som siteId 1 og norsk som primær; der ville begge snarveiene valgt feil
+     * språk uten at noen merket det. Sett den bare når standarden skal være
+     * noe annet enn primærsiten.
+     */
+    public ?string $defaultSite = null;
+
+    /**
      * @var array<string, array<string, bool>|bool> Seksjonshandle → skrivepolicy
      *
      * Enten `true` (alt lov) eller `['read' => bool, 'create' => bool,

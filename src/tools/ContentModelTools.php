@@ -9,6 +9,7 @@ use craft\fields\Matrix;
 use craft\models\EntryType;
 use craft\models\Section;
 use Mustasj\CraftMcp\helpers\SectionPolicy;
+use Mustasj\CraftMcp\helpers\SiteHelper;
 use Mustasj\CraftMcp\Module;
 
 /**
@@ -38,18 +39,21 @@ class ContentModelTools
      * begynt. På et lite nettsted er hele modellen grei; på et stort er den
      * en avgift på hver eneste sesjon.
      *
-     * @param string|null $only Bare denne seksjonen, eller null for alle
+     * @param string|null $section Bare denne seksjonen, eller null for alle. Navnet MÅ være
+     *                             likt nøkkelen i skjemaet: SDK-en kobler argumenter til
+     *                             parametere etter navn, og het den `$only` ble filteret
+     *                             ignorert i stillhet og hele modellen sendt hver gang.
      * @return array
      */
-    public function getContentModel(?string $only = null): array
+    public function getContentModel(?string $section = null): array
     {
         $sections = [];
 
-        if ($only !== null) {
-            SectionPolicy::assertAllowed($only, SectionPolicy::READ);
+        if ($section !== null) {
+            SectionPolicy::assertAllowed($section, SectionPolicy::READ);
         }
 
-        $handles = $only !== null ? [$only] : SectionPolicy::allowing(SectionPolicy::READ);
+        $handles = $section !== null ? [$section] : SectionPolicy::allowing(SectionPolicy::READ);
 
         foreach ($handles as $handle) {
             $section = Craft::$app->getEntries()->getSectionByHandle($handle);
@@ -112,11 +116,27 @@ class ContentModelTools
             ];
         }
 
+        // Fra konfigurasjonen, ikke hardkodet: «nb (primary)» var sant for
+        // prosjektet pakken ble trukket ut av, og ville løyet i alle andre.
+        $default = SiteHelper::defaultKey();
+        $sites = [];
+
+        foreach (Module::getInstance()->sites as $key => $handle) {
+            $craftSite = Craft::$app->getSites()->getSiteByHandle($handle);
+
+            if ($craftSite === null) {
+                continue;
+            }
+
+            $sites[$key] = [
+                'name' => $craftSite->name,
+                'language' => $craftSite->language,
+                'default' => $key === $default,
+            ];
+        }
+
         return [
-            'sites' => [
-                'nb' => 'Norwegian (primary)',
-                'en' => 'English',
-            ],
+            'sites' => $sites,
             'sections' => $sections,
             'categoryGroups' => $categoryGroups,
             'assets' => $volumes,
