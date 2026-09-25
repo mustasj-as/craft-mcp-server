@@ -1,147 +1,276 @@
 {# ========================================================================= #}
 {# MCP-tokens — fane på brukersiden                                          #}
 {#                                                                           #}
-{# Viser brukerens API-tokens for MCP-endepunktet, med generering og         #}
-{# tilbaketrekking. Nygenererte tokens vises i klartekst nøyaktig én gang    #}
-{# (via session-flash) — kun hashen lagres.                                  #}
+{# Rekkefølgen er flyten, og følger Laravel-varianten av samme skjerm:       #}
+{#   1. Tilgang (bare admin på andres fane)                                  #}
+{#   2. Opprett nytt token — viker for klarteksten rett etter opprettelse    #}
+{#   3. Klarteksten, nøyaktig én gang (session-flash; bare hashen lagres)    #}
+{#   4. «Koble til din egen AI» — oppskrifter, lukket til vanlig             #}
+{#   5. Tokenlista                                                           #}
+{#                                                                           #}
+{# Tokenet sendes som header, ikke i URL-en. `/<routePath>/t/<token>` virker #}
+{# fortsatt når `tokenInPath` er på, men vises ikke her: en URL med tokenet  #}
+{# i havner i serverlogger og nettleserhistorikk, og Claude Desktop kan nå   #}
+{# sende egne headere.                                                       #}
 {# ========================================================================= #}
 
 {% import '_includes/forms.twig' as forms %}
-{% import _self as mcp %}
 
-{% macro codeblock(text) %}
-    <div class="pane mcp-codeblock" tabindex="0">
-        <pre><code>{{- text -}}</code></pre>
-        <button type="button" class="btn small mcp-copy-btn" data-icon="clipboard" title="Kopier til utklippstavle">{{ 'Kopier'|t('app') }}</button>
+{% set hasAccess = accessSource is not null %}
+{% set token = newToken ?? '<token>' %}
+
+{# Oppskriftene: én liste med felter per klient. Felter kopieres hver for
+   seg, fordi Claude Desktop har URL og header i separate inputfelter.
+   ChatGPT står i lista, gjennomstreket og uten felter, i stedet for som en
+   fotnote under alle de andre: den som leter etter ChatGPT skal finne
+   svaret der hen leter. #}
+{% set recipes = {
+    desktop: {
+        label: 'Claude Desktop',
+        help: 'Innstillinger → Connectors → Add custom connector. Gi den navnet «' ~ serverName ~ '», velg «No sign-in», og legg til én header under «Request headers». Samme oppsett virker i claude.ai.',
+        fields: [
+            { label: 'URL', value: mcpUrl },
+            { label: 'Header-navn', value: 'authorization' },
+            { label: 'Header-verdi', value: 'Bearer ' ~ token },
+        ],
+    },
+    code: {
+        label: 'Claude Code',
+        help: 'Kjør denne i terminalen.',
+        fields: [
+            { label: 'Kommando', value: 'claude mcp add --transport http ' ~ serverSlug ~ ' ' ~ mcpUrl ~ ' --header "Authorization: Bearer ' ~ token ~ '"' },
+        ],
+    },
+    copilot: {
+        label: 'Copilot',
+        help: 'Samme mcp.json gjelder VS Code, Visual Studio, JetBrains og Xcode. Bruk brukerkonfigurasjonen («MCP: Open User Configuration» i VS Code), ikke .vscode/mcp.json i prosjektet — den havner i versjonskontroll, og tokenet er personlig.',
+        fields: [
+            { label: 'Konfigurasjon', value: { servers: { (serverSlug): { type: 'http', url: mcpUrl, headers: { Authorization: 'Bearer ' ~ token } } } }|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES')) },
+        ],
+    },
+    codex: {
+        label: 'Codex',
+        help: 'Legg dette inn i ~/.codex/config.toml.',
+        fields: [
+            { label: 'Konfigurasjon', value: '[mcp_servers.' ~ serverSlug ~ "]\nurl = \"" ~ mcpUrl ~ "\"\nhttp_headers = { Authorization = \"Bearer " ~ token ~ '" }' },
+        ],
+    },
+    gemini: {
+        label: 'Gemini',
+        help: 'Kjør denne i terminalen. «-s user» legger serveren i ~/.gemini/settings.json, så den gjelder alle prosjekter.',
+        fields: [
+            { label: 'Kommando', value: 'gemini mcp add -s user --transport http --header "Authorization: Bearer ' ~ token ~ '" ' ~ serverSlug ~ ' ' ~ mcpUrl },
+        ],
+    },
+    chatgpt: {
+        label: 'ChatGPT',
+        unavailable: true,
+        help: 'ChatGPT sine tilpassede connectors krever i dag OAuth i stedet for et enkelt bearer-token. Denne serveren støtter ikke det, så ChatGPT kan ikke kobles til ennå.',
+        fields: [],
+    },
+} %}
+
+{# ---- 1. Tilgang ---------------------------------------------------------- #}
+{% if not isCurrentUser and currentUser.admin %}
+    <div class="pane mcp-access">
+        {% if accessSource == 'admin' %}
+            <p><strong>Har MCP-tilgang</strong> via admin-rollen. Den kan ikke skrus av her.</p>
+        {% elseif accessSource == 'group' %}
+            <p><strong>Har MCP-tilgang</strong> via en brukergruppe. Fjern permissionen «Tilgang til MCP» fra gruppen, eller ta brukeren ut av den, for å skru den av.</p>
+        {% elseif canManageAccess %}
+            <form method="post" accept-charset="UTF-8" class="mcp-access-form">
+                {{ csrfInput() }}
+                {{ actionInput(moduleId ~ '/tokens/set-access') }}
+                {{ hiddenInput('userId', user.id) }}
+                {{ hiddenInput('enabled', hasAccess ? '0' : '1') }}
+                <div>
+                    <strong>Kan bruke MCP</strong>
+                    <p class="light">Lar brukeren lage tokens for AI-verktøy. Et token kan det samme som brukeren kan i Craft.
+                        {% if hasAccess %}Skrus tilgangen av, trekkes alle tokenene til brukeren tilbake.{% endif %}</p>
+                </div>
+                <button type="submit" class="btn{{ hasAccess ? '' : ' submit' }}">{{ hasAccess ? 'Fjern tilgang' : 'Gi tilgang' }}</button>
+            </form>
+        {% else %}
+            <p>Brukeren har ikke MCP-tilgang. Den gis med permissionen «Tilgang til MCP».</p>
+        {% endif %}
     </div>
-{% endmacro %}
+{% endif %}
 
-{% set tokenPlaceholder = newToken ?? '<token>' %}
-{% set tokenEnvVar = serverSlug|upper|replace({'-': '_'}) ~ '_TOKEN' %}
-{% set mcpPathUrl = mcpUrl|trim('/', 'right') ~ '/t/' ~ tokenPlaceholder %}
+{# ---- 2. Opprett nytt token ----------------------------------------------- #}
+{# Viker for klarteksten: rett etter opprettelse er jobben å få tokenet trygt
+   ut av skjermen, ikke å lage enda et. #}
+{% if isCurrentUser and hasAccess and not newToken %}
+    <h2>Opprett nytt token</h2>
+    <form method="post" accept-charset="UTF-8" class="pane mcp-create">
+        {{ csrfInput() }}
+        {{ actionInput(moduleId ~ '/tokens/create') }}
+        {{ hiddenInput('userId', user.id) }}
 
+        {{ forms.textField({
+            label: 'Navn',
+            instructions: 'Hvilken maskin eller klient tokenet skal brukes fra.',
+            id: 'mcp-token-name',
+            name: 'name',
+            placeholder: 'Claude Desktop',
+            maxlength: 40,
+            required: true,
+        }) }}
+
+        {{ forms.selectField({
+            label: 'Gyldighet',
+            instructions: 'Tokenet slutter å virke etter dette.',
+            id: 'mcp-token-expires',
+            name: 'expiresDays',
+            options: expiryOptions,
+            value: expiryDefault,
+            required: true,
+        }) }}
+
+        <div class="field">
+            <button type="submit" class="btn submit">Opprett</button>
+        </div>
+    </form>
+{% endif %}
+
+{# ---- 3. Klarteksten ------------------------------------------------------ #}
 {% if newToken %}
-    <div class="pane" style="border-left: 4px solid var(--enabled-color, #27ab83);">
-        <h2>Nytt token generert</h2>
-        <p class="warning with-icon">Kopier tokenet nå — det vises ikke igjen.</p>
+    <div class="pane mcp-new-token">
+        <h2>Ditt nye token</h2>
+        <p class="warning with-icon">Av sikkerhetshensyn vises tokenet bare én gang. Oppskriftene under er ferdig utfylt med det.</p>
         {% include '_includes/forms/copytext.twig' with {
             id: 'mcp-new-token',
             value: newToken,
             class: 'code fullwidth',
         } only %}
-        <p class="light">Brukes som <code>Authorization: Bearer &lt;token&gt;</code> mot <code>{{ mcpUrl }}</code>.</p>
-
-        {% if tokenInPath %}
-            <h2 style="margin-top: 18px;">Ferdig URL for Claude Desktop</h2>
-            <p class="light">Skal du bruke «Add custom connector», lim inn denne i stedet — den inneholder tokenet:</p>
-            {% include '_includes/forms/copytext.twig' with {
-                id: 'mcp-new-connector-url',
-                value: mcpPathUrl,
-                class: 'code fullwidth',
-            } only %}
-        {% endif %}
     </div>
-    <hr>
 {% endif %}
 
-<h2>Koble til en AI-klient</h2>
-{% if not newToken %}
-    <p class="light">Oppskriftene under bruker <code>&lt;token&gt;</code> som plassholder — bytt ut med et av tokenene under, eller generer et nytt.</p>
+{# ---- 4. Oppskrifter ------------------------------------------------------ #}
+{# Uten et token er det ingenting å koble til med, og oppskriftene ville bare
+   vist en plassholder. Lukket til vanlig; åpen rett etter opprettelse, som er
+   det ene øyeblikket de er ferdig utfylt. #}
+{% if isCurrentUser and hasAccess and (newToken or tokens is not empty) %}
+    <details class="pane mcp-connect"{{ newToken ? ' open' }}>
+        <summary><h2>Koble til din egen AI</h2></summary>
+
+        <p class="light">
+            {% if newToken %}
+                Velg hvilken AI-assistent du vil sette opp.
+            {% else %}
+                Velg hvilken AI-assistent du vil sette opp. Bytt ut <code>&lt;token&gt;</code> med et token — tokenet vises bare én gang, så lag et nytt over om du ikke har det lenger.
+            {% endif %}
+        </p>
+
+        <div class="mcp-tabs" role="tablist">
+            {% for key, recipe in recipes %}
+                <button type="button" class="btn small mcp-tab{{ loop.first ? ' is-active' }}" role="tab" aria-selected="{{ loop.first ? 'true' : 'false' }}" data-tab="{{ key }}"{% if recipe.unavailable ?? false %} title="Støttes ikke ennå"{% endif %}>
+                    {%- if recipe.unavailable ?? false %}<s>{{ recipe.label }}</s><span class="visually-hidden"> (støttes ikke ennå)</span>{% else %}{{ recipe.label }}{% endif -%}
+                </button>
+            {% endfor %}
+        </div>
+
+        {% for key, recipe in recipes %}
+            <div class="mcp-panel" role="tabpanel" data-panel="{{ key }}"{{ loop.first ? '' : ' hidden' }}>
+                <p class="light">{{ recipe.help }}</p>
+                {% for field in recipe.fields %}
+                    {% set fieldId = 'mcp-' ~ key ~ '-' ~ loop.index %}
+                    <div class="field">
+                        <div class="heading"><label for="{{ fieldId }}">{{ field.label }}</label></div>
+                        {% if "\n" in field.value %}
+                            <div class="mcp-codeblock">
+                                <textarea id="{{ fieldId }}" class="text code fullwidth" rows="{{ field.value|split("\n")|length }}" readonly>{{ field.value }}</textarea>
+                                <button type="button" class="btn small mcp-copy" data-icon="clipboard" data-target="{{ fieldId }}">Kopier</button>
+                            </div>
+                        {% else %}
+                            {% include '_includes/forms/copytext.twig' with {
+                                id: fieldId,
+                                value: field.value,
+                                class: 'code fullwidth',
+                            } only %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+    </details>
 {% endif %}
 
-<div class="mcp-connect">
-    <div class="mcp-connect-tabs">
-        {% if tokenInPath %}
-            <button type="button" class="btn small mcp-tab-btn is-active" data-tab="claude-desktop">Claude Desktop</button>
-        {% endif %}
-        <button type="button" class="btn small mcp-tab-btn{{ tokenInPath ? '' : ' is-active' }}" data-tab="claude-code">Claude Code</button>
-        <button type="button" class="btn small mcp-tab-btn" data-tab="codex">Codex CLI</button>
-        <button type="button" class="btn small mcp-tab-btn" data-tab="gemini">Gemini CLI</button>
-        <button type="button" class="btn small mcp-tab-btn" data-tab="claude-desktop-json">Claude Desktop (manuell JSON)</button>
-    </div>
+{# ---- 5. Tokenlista ------------------------------------------------------- #}
+{% if hasAccess or tokens is not empty %}
+    <h2>{{ isCurrentUser ? 'Mine tokens' : 'Tokens' }}</h2>
 
-    <div class="mcp-tab-panel" data-panel="claude-code"{{ tokenInPath ? ' hidden'|raw : '' }}>
-        <p class="light">Kjør i terminalen:</p>
-        {% set snippet %}claude mcp add --transport http {{ serverSlug }} {{ mcpUrl }} --header "Authorization: Bearer {{ tokenPlaceholder }}"{% endset %}
-        {{ mcp.codeblock(snippet) }}
-    </div>
-
-    <div class="mcp-tab-panel" data-panel="claude-desktop"{{ tokenInPath ? '' : ' hidden'|raw }}>
-        <p class="light">Ingen config-fil og ingen Node/npx — bare én URL. Kopier denne:</p>
-        {% set snippet %}{{ mcpPathUrl }}{% endset %}
-        {{ mcp.codeblock(snippet) }}
-        <p class="light">Lim den inn i Claude Desktop under <strong>Innstillinger → Connectors → Add custom connector</strong>, med <code>{{ serverName }}</code> som navn. Samme URL virker også i claude.ai og i Claude-appen på mobil.</p>
-        <p class="warning with-icon">Denne URL-en inneholder tokenet ditt — behandle den som et passord. Fordi tokenet ligger i adressen havner det i serverlogger, så bruk et eget token per klient og ikke del URL-en i chat eller e-post.</p>
-        <p class="light">Custom connectors krever Claude Pro, Max, Team eller Enterprise. På gratisplanen: bruk <strong>Claude Desktop (manuell JSON)</strong>.</p>
-    </div>
-
-    <div class="mcp-tab-panel" data-panel="codex" hidden>
-        <p class="light">Legg til i <code>~/.codex/config.toml</code>:</p>
-        {% set snippet %}[mcp_servers.{{ serverSlug }}]
-url = "{{ mcpUrl }}"
-bearer_token_env_var = "{{ tokenEnvVar }}"{% endset %}
-        {{ mcp.codeblock(snippet) }}
-        <p class="light">Sett miljøvariabelen i shell-profilen din:</p>
-        {% set snippet %}export {{ tokenEnvVar }}="{{ tokenPlaceholder }}"{% endset %}
-        {{ mcp.codeblock(snippet) }}
-    </div>
-
-    <div class="mcp-tab-panel" data-panel="gemini" hidden>
-        <p class="light">Legg til i <code>~/.gemini/settings.json</code>:</p>
-        {% set snippet %}{
-  "mcpServers": {
-    "{{ serverSlug }}": {
-      "httpUrl": "{{ mcpUrl }}",
-      "headers": { "Authorization": "Bearer {{ tokenPlaceholder }}" }
-    }
-  }
-}{% endset %}
-        {{ mcp.codeblock(snippet) }}
-    </div>
-
-    <div class="mcp-tab-panel" data-panel="claude-desktop-json" hidden>
-        <p class="light">Alternativet når du ikke har Claude Pro/Max/Team, eller vil holde tokenet ute av URL-en. Krever at Node/npx er installert (<code>npx -v</code> må svare). Legg til i <code>claude_desktop_config.json</code> (Innstillinger → Developer → Edit Config):</p>
-        {% set snippet %}{
-  "mcpServers": {
-    "{{ serverSlug }}": {
-      "command": "npx",
-      "args": ["mcp-remote", "{{ mcpUrl }}", "--header", "Authorization:{{ '${' }}{{ tokenEnvVar }}}"],
-      "env": { "{{ tokenEnvVar }}": "Bearer {{ tokenPlaceholder }}" }
-    }
-  }
-}{% endset %}
-        {{ mcp.codeblock(snippet) }}
-        <p class="light">Start Claude Desktop på nytt etterpå. Merk formen <code>Authorization:{{ '${' }}{{ tokenEnvVar }}}</code> uten mellomrom — Claude Desktop splitter argumenter på mellomrom, derfor settes headeren sammen via miljøvariabelen.</p>
-    </div>
-
-    <p class="light">ChatGPT sine tilpassede connectors krever i dag OAuth i stedet for et enkelt bearer-token, så det er ikke satt opp en oppskrift for det her.</p>
-</div>
+    {% if tokens is empty %}
+        <p class="zilch small">{{ isCurrentUser ? 'Du har ingen aktive tokens ennå.' : 'Brukeren har ingen aktive tokens.' }}</p>
+    {% else %}
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th>Navn</th>
+                    <th>Sist brukt</th>
+                    <th>Utløper</th>
+                    <th>Opprettet</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in tokens %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.lastUsedAt ? row.lastUsedAt|date('short') ~ ' ' ~ row.lastUsedAt|time('short') : '—' }}</td>
+                        <td>{{ row.expiresAt ? row.expiresAt|date('short') : 'aldri' }}</td>
+                        <td>{{ row.dateCreated|date('short') }}</td>
+                        <td class="thin">
+                            <form method="post" accept-charset="UTF-8">
+                                {{ csrfInput() }}
+                                {{ actionInput(moduleId ~ '/tokens/revoke') }}
+                                {{ hiddenInput('userId', user.id) }}
+                                {{ hiddenInput('id', row.id) }}
+                                <button type="submit" class="btn small">Trekk tilbake</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endif %}
 
 <style>
-    .mcp-connect-tabs { display: flex; gap: 4px; margin-bottom: 14px; flex-wrap: wrap; }
-    .mcp-tab-btn.is-active { background: var(--gray-200); font-weight: 600; }
-    .mcp-codeblock { position: relative; margin: 0 0 14px; padding: 14px 90px 14px 14px; max-height: 320px; overflow: auto; }
-    .mcp-codeblock pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
-    .mcp-codeblock .mcp-copy-btn { position: absolute; top: 10px; right: 10px; }
+    .mcp-access-form { display: flex; gap: 16px; align-items: center; justify-content: space-between; }
+    .mcp-access-form p { margin: 4px 0 0; }
+    .mcp-create { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
+    .mcp-create > .field { margin: 0; }
+    .mcp-create > .field:first-of-type { flex: 1; min-width: 240px; }
+    .mcp-new-token { border-left: 4px solid var(--enabled-color, #27ab83); }
+    .mcp-connect > summary { cursor: pointer; list-style: revert; }
+    .mcp-connect > summary h2 { display: inline; margin: 0; }
+    .mcp-tabs { display: flex; gap: 4px; margin: 14px 0; flex-wrap: wrap; }
+    .mcp-tab.is-active { background: var(--gray-200); font-weight: 600; }
+    .mcp-tab s { opacity: .7; }
+    .mcp-codeblock { position: relative; }
+    .mcp-codeblock textarea { padding-right: 90px; resize: vertical; }
+    .mcp-codeblock .mcp-copy { position: absolute; top: 8px; right: 8px; }
 </style>
 <script>
     (function() {
-        var buttons = document.querySelectorAll('.mcp-tab-btn');
-        var panels = document.querySelectorAll('.mcp-tab-panel');
-        buttons.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                buttons.forEach(function(b) { b.classList.remove('is-active'); });
-                btn.classList.add('is-active');
+        var tabs = document.querySelectorAll('.mcp-tab');
+        var panels = document.querySelectorAll('.mcp-panel');
+        tabs.forEach(function(tab) {
+            tab.addEventListener('click', function() {
+                tabs.forEach(function(t) {
+                    t.classList.toggle('is-active', t === tab);
+                    t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+                });
                 panels.forEach(function(panel) {
-                    panel.hidden = panel.dataset.panel !== btn.dataset.tab;
+                    panel.hidden = panel.dataset.panel !== tab.dataset.tab;
                 });
             });
         });
 
-        document.querySelectorAll('.mcp-copy-btn').forEach(function(btn) {
+        document.querySelectorAll('.mcp-copy').forEach(function(btn) {
             btn.addEventListener('click', function() {
-                var code = btn.closest('.mcp-codeblock').querySelector('code').textContent;
-                navigator.clipboard.writeText(code).then(function() {
+                navigator.clipboard.writeText(document.getElementById(btn.dataset.target).value).then(function() {
                     if (window.Craft && Craft.cp) {
                         Craft.cp.displayNotice('Kopiert til utklippstavlen.');
                     }
@@ -150,73 +279,3 @@ bearer_token_env_var = "{{ tokenEnvVar }}"{% endset %}
         });
     })();
 </script>
-
-<hr>
-
-<h2>Aktive tokens</h2>
-
-{% if tokens is empty %}
-    <p class="zilch small">Ingen tokens ennå.</p>
-{% else %}
-    <table class="data fullwidth">
-        <thead>
-            <tr>
-                <th>Navn</th>
-                <th>Sist brukt</th>
-                <th>Utløper</th>
-                <th>Opprettet</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for token in tokens %}
-                <tr>
-                    <td><code>{{ token.name }}</code></td>
-                    <td>{{ token.lastUsedAt ? token.lastUsedAt|date('short') ~ ' ' ~ token.lastUsedAt|time('short') : '—' }}</td>
-                    <td>{{ token.expiresAt ? token.expiresAt|date('short') : 'aldri' }}</td>
-                    <td>{{ token.dateCreated|date('short') }}</td>
-                    <td class="thin">
-                        <form method="post" accept-charset="UTF-8">
-                            {{ csrfInput() }}
-                            {{ actionInput(moduleId ~ '/tokens/revoke') }}
-                            {{ hiddenInput('userId', user.id) }}
-                            {{ hiddenInput('id', token.id) }}
-                            <button type="submit" class="btn small">Trekk tilbake</button>
-                        </form>
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% endif %}
-
-<hr>
-
-<h2>Generer nytt token</h2>
-
-<form method="post" accept-charset="UTF-8" class="flex flex-nowrap" style="align-items: flex-end;">
-    {{ csrfInput() }}
-    {{ actionInput(moduleId ~ '/tokens/create') }}
-    {{ hiddenInput('userId', user.id) }}
-
-    {{ forms.textField({
-        label: 'Navn',
-        instructions: 'F.eks. hvilken maskin eller klient tokenet skal brukes fra.',
-        id: 'mcp-token-name',
-        name: 'name',
-        value: '',
-        required: true,
-    }) }}
-
-    {{ forms.textField({
-        label: 'Utløper om (dager)',
-        instructions: 'Tomt = utløper aldri.',
-        id: 'mcp-token-expires',
-        name: 'expiresDays',
-        size: 8,
-    }) }}
-
-    <div class="field">
-        <button type="submit" class="btn submit">Generer token</button>
-    </div>
-</form>

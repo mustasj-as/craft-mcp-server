@@ -8,7 +8,10 @@ use craft\events\DefineEditUserScreensEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\events\UserGroupsAssignEvent;
+use craft\events\UserPermissionsEvent;
 use craft\services\UserPermissions;
+use craft\services\Users;
 use craft\web\UrlManager;
 use craft\web\View;
 use Mustasj\CraftMcp\services\Tokens;
@@ -208,6 +211,7 @@ class Module extends BaseModule
 
         $this->_validateConfig();
         $this->_registerPermissions();
+        $this->_registerAccessSync();
         $this->_registerSiteRoutes();
 
         if (!Craft::$app->getRequest()->getIsConsoleRequest() && Craft::$app->getRequest()->getIsCpRequest()) {
@@ -308,6 +312,49 @@ class Module extends BaseModule
                 ];
             },
         );
+    }
+
+    /**
+     * Trekker tilbake tokens når en bruker mister MCP-tilgangen.
+     *
+     * Tilgangen kan forsvinne tre veier: permissionen fjernes fra brukeren,
+     * fra en gruppe, eller brukeren tas ut av en gruppe. Alle tre lyttes på.
+     *
+     * **Sjekken venter til slutten av requesten.** Når CP-en lagrer en bruker,
+     * lagres gruppene og permissionene som to steg. Sjekket vi etter det
+     * første, ville en bruker som flyttes fra gruppetilgang til tilgang på
+     * brukernivå stått uten tilgang et øyeblikk — og mistet tokenene sine i
+     * en lagring som skulle beholde dem. Gruppe-permissions sjekker alle
+     * brukere med tokens; det er få, og en gruppe kan ha mange medlemmer.
+     *
+     * @return void
+     */
+    private function _registerAccessSync(): void
+    {
+        $pending = [];
+        $scheduled = false;
+        $tokens = fn() => $this->getTokens();
+
+        $schedule = static function(?int $userId) use (&$pending, &$scheduled, $tokens): void {
+            // null = alle; det sluker enkelt-id-ene.
+            $pending = $userId === null || $pending === null ? null : [...$pending, $userId];
+
+            if ($scheduled) {
+                return;
+            }
+
+            $scheduled = true;
+            Craft::$app->onAfterRequest(static function() use (&$pending, $tokens): void {
+                $tokens()->revokeTokensWithoutAccess($pending === null ? null : array_unique($pending));
+            });
+        };
+
+        Event::on(UserPermissions::class, UserPermissions::EVENT_AFTER_SAVE_USER_PERMISSIONS,
+            static fn(UserPermissionsEvent $event) => $schedule($event->userId));
+        Event::on(UserPermissions::class, UserPermissions::EVENT_AFTER_SAVE_GROUP_PERMISSIONS,
+            static fn() => $schedule(null));
+        Event::on(Users::class, Users::EVENT_AFTER_ASSIGN_USER_TO_GROUPS,
+            static fn(UserGroupsAssignEvent $event) => $schedule($event->userId));
     }
 
     /**

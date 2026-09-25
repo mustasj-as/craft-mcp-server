@@ -53,7 +53,7 @@ php craft mcp-api/tokens/create <brukernavn>
 | `instructionsPath` | `null` | Markdown-fil med `instructions`. Craft-alias tillatt |
 | `tokenPrefix` | `craft_` | **Må være unikt per prosjekt.** Små bokstaver/tall + `_` |
 | `routePath` | `mcp` | URL-stien endepunktet svarer på |
-| `tokenInPath` | `true` | Om `/mcp/t/<token>` også registreres |
+| `tokenInPath` | `true` | Om `/mcp/t/<token>` også registreres. Token-fanen viser den ikke lenger — tokenet sendes som header — men den virker for oppkoblinger som alt bruker den. Sett `false` når ingen gjør det |
 | `sites` | — | **Påkrevd.** Språkkode → Craft site-handle |
 | `defaultSite` | `null` | Språkkoden som brukes når `site` utelates. Tomt gir koden for Craft-installasjonens **primære** site — ikke første nøkkel i `sites`, og ikke siteId 1 |
 | `sections` | — | **Påkrevd.** Seksjonshandle → policy |
@@ -111,6 +111,29 @@ trenger ett eget verktøy forke pakken.
 `update_asset`.
 
 Skriveverktøyene lager **utkast**. Ingenting går live uten `publish_draft`.
+
+## Token-fanen
+
+Fanen «MCP-tokens» på brukersiden kommer fra pakken. Flyten:
+
+1. **Opprett** — navn (unikt per bruker, maks 40 tegn) og gyldighet fra en
+   fast liste, 1 uke til 12 mnd, 3 mnd forhåndsvalgt. Tokens som aldri
+   utløper kan bare lages fra konsollen.
+2. **Klarteksten** vises én gang, i stedet for skjemaet.
+3. **«Koble til din egen AI»** — oppskrifter for Claude Desktop (URL og
+   header hver for seg, ikke tokenet i URL-en), Claude Code, Copilot, Codex
+   og Gemini. Skjult uten tokens, lukket til vanlig, åpen og ferdig utfylt
+   rett etter opprettelse.
+4. **Tokenlista.**
+
+Tokens lages bare av brukeren selv. Admin ser andres faner med en bryter
+«Kan bruke MCP» (permission på brukernivå; Craft Pro), og kan trekke
+tilbake andres tokens. Kommer tilgangen fra admin-rollen eller en gruppe,
+sier fanen det i stedet for å vise bryteren.
+
+**Mister en bruker tilgangen — hvor som helst i CP-en — trekkes tokenene
+tilbake** på slutten av requesten. Endepunktet avviser dem uansett; dette
+hindrer at glemte tokens virker igjen den dagen tilgangen gis tilbake.
 
 ## To designvalg verdt å kjenne
 

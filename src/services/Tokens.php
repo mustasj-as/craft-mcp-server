@@ -9,6 +9,7 @@ use craft\elements\User;
 use craft\helpers\Db;
 use craft\helpers\StringHelper;
 use DateTime;
+use Mustasj\CraftMcp\helpers\McpAccess;
 use Mustasj\CraftMcp\Module;
 use yii\base\Component;
 
@@ -279,6 +280,66 @@ class Tokens extends Component
     public function revokeToken(int $id): bool
     {
         return Db::delete(self::TABLE, ['id' => $id]) > 0;
+    }
+
+    /**
+     * Om brukeren allerede har et token med dette navnet.
+     *
+     * Navnet er det eneste som skiller tokenene i lista. To som heter
+     * «Claude Desktop» kan ikke trekkes tilbake enkeltvis uten å gjette.
+     *
+     * @param int $userId
+     * @param string $name
+     * @return bool
+     */
+    public function nameExists(int $userId, string $name): bool
+    {
+        return (new Query())
+            ->from(self::TABLE)
+            ->where(['userId' => $userId, 'name' => $name])
+            ->exists();
+    }
+
+    /**
+     * Trekker tilbake tokenene til brukere som ikke lenger har MCP-tilgang.
+     *
+     * Endepunktet avviser dem uansett (ServerController sjekker permissionen
+     * på hvert kall), så dette er ikke det som stenger døra. Det er det som
+     * hindrer at den åpner seg igjen: uten sletting ville gamle, glemte tokens
+     * virket igjen den dagen brukeren fikk tilgangen tilbake.
+     *
+     * @param int[]|null $userIds Bare disse brukerne, eller null for alle med tokens
+     * @return int Antall tokens trukket tilbake
+     */
+    public function revokeTokensWithoutAccess(?array $userIds = null): int
+    {
+        $query = (new Query())
+            ->select(['userId'])
+            ->distinct()
+            ->from(self::TABLE);
+
+        if ($userIds !== null) {
+            $query->where(['userId' => $userIds]);
+        }
+
+        $revoke = [];
+
+        foreach ($query->column() as $userId) {
+            $user = Craft::$app->getUsers()->getUserById((int)$userId);
+
+            if ($user === null || McpAccess::source($user) === null) {
+                $revoke[] = (int)$userId;
+            }
+        }
+
+        if ($revoke === []) {
+            return 0;
+        }
+
+        $count = Db::delete(self::TABLE, ['userId' => $revoke]);
+        Craft::info(sprintf('MCP: trakk tilbake %d token(s) for bruker(e) uten tilgang: %s.', $count, implode(', ', $revoke)), __METHOD__);
+
+        return $count;
     }
 
     // =========================================================================
