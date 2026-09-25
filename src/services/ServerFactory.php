@@ -257,7 +257,11 @@ class ServerFactory extends Component
             [AssetTools::class, 'listAssetFolders'],
             name: 'list_asset_folders',
             description: 'List the asset folders available in Craft, with how many assets each one holds.',
-            inputSchema: ['type' => 'object', 'properties' => []],
+            // `properties` MÅ være et objekt, ikke `[]`: json_encode gjør en
+            // tom PHP-array til JSON-lista `[]`, og klienter som validerer
+            // tools/list (Claude Code gjør det) forkaster da HELE lista, ikke
+            // bare dette verktøyet — serveren står som tilkoblet med null verktøy.
+            inputSchema: ['type' => 'object', 'properties' => new \stdClass()],
         );
 
         $builder->addTool(
