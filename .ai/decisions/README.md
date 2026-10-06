@@ -13,9 +13,11 @@ Sannsynligvis er det begrunnet, og som oftest med et målt tall.
 | [0003](0003-skjemaer-bygges-ved-kjoring.md) | Pakkens verktøyskjemaer bygges ved kjøring, ikke med attributter | Vedtatt |
 | [0004](0004-skrivepolicy-per-operasjon.md) | Skrivepolicy settes per operasjon, ikke per seksjon | Vedtatt |
 | [0005](0005-token-i-url-sti.md) | Tokenet kan stå i URL-stien, med åpne øyne | Vedtatt, midlertidig |
+| [0006](0006-token-i-header-som-standard.md) | Tokenet sendes som header; URL-varianten vises ikke lenger | Vedtatt, opphever 0005 delvis |
 | [0007](0007-element-id-og-utkast-id-er-egne-parametere.md) | Element-ID og utkast-ID er egne parametere, og utkast er aldri offentlige | Foreslått |
+| [0008](0008-develop-for-publisering.md) | `develop` som integrasjonsbranch, `main` er publisert | Vedtatt |
 
-Neste ledige nummer: **0008**. (0006 finnes som fil, men står ikke i tabellen ennå.)
+Neste ledige nummer: **0009**.
 
 ## Format
 
