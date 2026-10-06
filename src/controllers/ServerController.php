@@ -158,13 +158,21 @@ class ServerController extends Controller
     private function _middleware(Psr17Factory $psr17): array
     {
         $hosts = ['localhost', '127.0.0.1', '[::1]', ...Module::getInstance()->allowedHosts];
+        $siteHosts = 0;
 
         foreach (Craft::$app->getSites()->getAllSites() as $site) {
             $host = parse_url((string)$site->getBaseUrl(), PHP_URL_HOST);
 
             if (is_string($host) && $host !== '') {
                 $hosts[] = $host;
+                $siteHosts++;
             }
+        }
+
+        // En base-URL som `@web` er relativ i web-requests og gir ingen vert.
+        // Uten denne meldingen ser det bare ut som SDK-en avviser alt.
+        if ($siteHosts === 0 && Module::getInstance()->allowedHosts === []) {
+            Craft::warning('MCP: ingen site har absolutt base-URL, og `allowedHosts` er tom. Bare localhost slipper gjennom.', __METHOD__);
         }
 
         $hosts = array_values(array_unique(array_map('strtolower', $hosts)));
