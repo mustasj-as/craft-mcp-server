@@ -99,35 +99,57 @@ class WriteTools
     /**
      * Endrer en eksisterende entry ved å lage et utkast av den.
      *
-     * @param int $entryId ID-en til entryen som skal endres
+     * Entryen angis enten med element-ID (`entryId`, også `elementId` fra
+     * create_entry) eller med utkast-ID (`draftId`). De to er ulike tallrekker
+     * som overlapper, så de kan ikke tolkes fra ett og samme parameter: et
+     * utkast-ID sendt som element-ID traff tidligere et helt annet element,
+     * gjerne en nestet Matrix-blokk.
+     *
+     * @param int|null $entryId Element-ID-en til entryen eller utkastet
      * @param array $fields Feltverdier per handle (kun feltene som skal endres)
      * @param string|null $title Ny tittel
      * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @param int|null $parentId Ny forelder i structure-seksjoner (0 = flytt til toppnivå)
+     * @param int|null $draftId Utkast-ID fra create_entry/update_entry (alternativ til entryId)
      * @return array
      * @throws \Throwable
      */
     public function updateEntry(
-        int $entryId,
+        ?int $entryId = null,
         array $fields = [],
         ?string $title = null,
         ?string $site = null,
         ?int $parentId = null,
+        ?int $draftId = null,
     ): array {
         $site ??= SiteHelper::defaultKey();
 
+        if (($entryId === null) === ($draftId === null)) {
+            throw new ToolCallException('Provide exactly one of "entryId" or "draftId".');
+        }
+
         $user = $this->_requireUser();
 
-        /** @var Entry|null $entry */
-        $entry = Entry::find()
-            ->id($entryId)
+        // Seksjonsfilteret gjør to ting: det håndhever update-policyen, og det
+        // utelukker nestede entries (Matrix-blokker), som ikke har seksjon.
+        $query = Entry::find()
+            ->section(SectionPolicy::allowing(SectionPolicy::UPDATE))
             ->site(SiteHelper::resolve($site)->handle)
-            ->drafts(null)
-            ->status(null)
-            ->one();
+            ->status(null);
+
+        if ($draftId !== null) {
+            $query->draftId($draftId);
+        } else {
+            $query->id($entryId)->drafts(null);
+        }
+
+        /** @var Entry|null $entry */
+        $entry = $query->one();
 
         if ($entry === null) {
-            throw new ToolCallException(sprintf('Entry %d not found on site "%s".', $entryId, $site));
+            throw new ToolCallException($draftId !== null
+                ? sprintf('Draft %d not found on site "%s" in a section that allows updates over MCP.', $draftId, $site)
+                : sprintf('Entry %d not found on site "%s" in a section that allows updates over MCP. If %d is a draftId from create_entry, pass it as "draftId" instead.', $entryId, $site, $entryId));
         }
 
         if (!$entry->canCreateDrafts($user)) {
@@ -365,7 +387,9 @@ class WriteTools
             'canonicalId' => $draft->getIsUnpublishedDraft() ? null : $draft->getCanonicalId(),
             'title' => $draft->title,
             'cpEditUrl' => $draft->getCpEditUrl(),
-            'note' => 'Draft saved. Call publish_draft with draftId to make it live, or review it in the control panel.',
+            'note' => $draft->getIsUnpublishedDraft()
+                ? 'Draft saved. Call publish_draft with draftId to make it live. Read it back with get_entry (draftId), change it with update_entry (draftId). In the control panel, new drafts only appear in the entry list when the "Drafts" status filter is selected — or open cpEditUrl directly.'
+                : 'Draft saved. Call publish_draft with draftId to make it live, or review it in the control panel via cpEditUrl.',
         ];
     }
 }

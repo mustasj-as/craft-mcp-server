@@ -28,7 +28,8 @@ src/
 │   └── Tokens              utsteding, validering, tabelloppretting
 ├── helpers/
 │   ├── SectionPolicy       hvilke seksjoner, og hva som er lov på hver
-│   ├── SiteHelper          språkkode ↔ Craft site, avviser deaktiverte
+│   ├── SiteHelper          språkkode ↔ Craft site, avviser deaktiverte, standard-site
+│   ├── McpAccess           hvor MCP-tilgangen kommer fra (admin/gruppe/bruker), bryteren
 │   ├── EntryAccess         lesetilgang via Crafts canView()
 │   ├── EntrySerializer     entry → array
 │   └── FieldValues         feltverdier ut og inn
@@ -80,11 +81,12 @@ egen konfigurasjonsfil, og **ingen fil i pakken skal endres per installasjon.**
 | Nøkkel | Påkrevd | Hva den gjør |
 |---|---|---|
 | `sites` | ja | Språkkode → Craft site-handle |
+| `defaultSite` | nei | Språkkode når `site` utelates. Tomt = koden for Craft-installasjonens **primære** site, ikke første nøkkel og ikke siteId 1 |
 | `sections` | ja | Seksjonshandle → `true` eller `['read'/'create'/'update' => bool]` |
 | `serverName`, `serverDescription`, `serverVersion` | nei | Det klienten ser i `initialize` |
 | `instructionsPath` | nei | Markdown-fil med `instructions`. Craft-alias tillatt |
 | `tokenPrefix` | nei (men bør) | Må være unikt per prosjekt. Valideres mot `/^[a-z0-9]+_$/` |
-| `routePath`, `tokenInPath` | nei | URL-sti, og om `/mcp/t/<token>` registreres |
+| `routePath`, `tokenInPath` | nei | URL-sti, og om `/mcp/t/<token>` registreres. Vises ikke i CP-en; sett `false` i nye installasjoner (ADR 0006) |
 | `categoryGroups` | nei | Kategorigrupper som eksponeres |
 | `fieldNotes` | nei | Felthandle → merknad for felt der lagret verdi ≠ vist verdi |
 | `toolPaths` | nei | Mapper med prosjektets egne verktøyklasser |
@@ -97,6 +99,11 @@ på ugyldig `tokenPrefix` — prefikset går inn i en regex i sti-ruta.
 - **Site-ruter** på `EVENT_REGISTER_SITE_URL_RULES` — `/<routePath>` og
   eventuelt `/<routePath>/t/<token>`
 - **Permission** «Tilgang til MCP» (`accessMcpApi`)
+- **Tilgangssynk** på `EVENT_AFTER_SAVE_USER_PERMISSIONS`,
+  `EVENT_AFTER_SAVE_GROUP_PERMISSIONS` og `EVENT_AFTER_ASSIGN_USER_TO_GROUPS`:
+  tokenene til brukere som har mistet tilgangen trekkes tilbake — på
+  `onAfterRequest`, ikke i hendelsen, fordi CP-en lagrer grupper og
+  permissions som to steg
 - **CP-fane** «MCP-tokens» på brukersiden, CP-ruter og template-rot
 - **Tokens-tabellen** via `Tokens::ensureTable()`
 
@@ -114,3 +121,17 @@ php craft <modul-id>/tokens/revoke <id>
 
 I DDEV-prosjekter: `ddev craft …`, eller `ddev exec php craft …` der
 prosjekttypen er `php` og ikke `craftcms`.
+
+## Skjemaene sjekkes mot metodene
+
+`ServerFactory::_addTool()` registrerer hvert pakkeverktøy og sammenligner
+skjemaet med metoden via refleksjon før det gis til SDK-en. **SDK-en kobler
+argumenter til parametere etter navn**, så en skjemanøkkel som ikke er et
+parameternavn blir ignorert uten feil. Det skjedde to ganger før vakten kom
+(v1.2.0): `update_entry` sendte `id` til `$entryId` og feilet alltid, og
+`get_content_model` sendte `section` til `$only` og filtrerte aldri.
+Avvik kaster `LogicException` ved oppstart.
+
+Samme sted: tom `properties` blir `{}` (ikke `[]`), og tom `enum` fjernes.
+Begge er ugyldig JSON Schema, og Claude Code forkaster da **hele**
+`tools/list` — serveren står tilkoblet med null verktøy (v1.1.2).

@@ -1,7 +1,7 @@
 # 0005 — Tokenet kan stå i URL-stien, med åpne øyne
 
 - **Dato:** 2026-07 (omtrentlig — nedtegnet retroaktivt 2026-09-14)
-- **Status:** Vedtatt, midlertidig
+- **Status:** Delvis opphevet av [0006](0006-token-i-header-som-standard.md) (2026-09-25) — ruta finnes fortsatt, men vises ikke i CP-en
 - **Besluttet av:** Mustasj-teamet, under arbeidet med opphavsprosjektet
 
 ## Kontekst

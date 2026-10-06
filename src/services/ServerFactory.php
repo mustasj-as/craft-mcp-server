@@ -139,24 +139,26 @@ class ServerFactory extends Component
         ];
 
         self::_addTool($builder, [ArticleTools::class, 'listArticles'], 'list_entries',
-            'List entries in a section, newest first. Returns compact summaries (id, title, slug, status, url, postDate) and the total count; use get_entry for full content. Use limit/offset to page through large sections.',
+            'List entries in a section, newest first. Returns compact summaries (id, title, slug, status, url, postDate) and the total count; use get_entry for full content. Use limit/offset to page through large sections. Pass drafts: true to list new, never-published drafts (e.g. from create_entry) instead of published entries; their summaries include draftId.',
             [
                 'section' => ['type' => 'string', 'enum' => $readable],
                 'query' => ['type' => ['string', 'null'], 'description' => 'Free-text search across the entry\'s searchable content.'],
                 'site' => $site(),
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100, 'description' => 'Maximum number of results (1-100). Default 20.'],
                 'offset' => ['type' => 'integer', 'minimum' => 0, 'description' => 'Number of results to skip, for paging.'],
+                'drafts' => ['type' => 'boolean', 'description' => 'List unpublished drafts instead of published entries. Default false.'],
             ],
             ['section'],
         );
 
         self::_addTool($builder, [ArticleTools::class, 'getArticle'], 'get_entry',
-            'Get one entry in full, by id or by slug, including all fields and content blocks. Pass either id or slug.',
+            'Get one entry in full, by id, slug or draftId, including all fields and content blocks. Drafts are found by id (the elementId from create_entry) or by draftId; slug only finds published entries.',
             [
                 'section' => ['type' => 'string', 'enum' => $readable],
-                'id' => ['type' => ['integer', 'null'], 'description' => 'Entry id (from list_entries).'],
+                'id' => ['type' => ['integer', 'null'], 'description' => 'Entry id (from list_entries), or a draft\'s elementId.'],
                 'slug' => ['type' => ['string', 'null'], 'description' => 'Entry slug. Slugs can differ per site.'],
                 'site' => $site(),
+                'draftId' => ['type' => ['integer', 'null'], 'description' => 'Draft id (from create_entry or update_entry).'],
             ],
             ['section'],
         );
@@ -176,15 +178,16 @@ class ServerFactory extends Component
         );
 
         self::_addTool($builder, [WriteTools::class, 'updateEntry'], 'update_entry',
-            'Update an existing entry by creating a draft of it — the live entry is never modified directly. Accepts both canonical entry ids and draft ids (from create_entry); editing a draft modifies it in place. Only the arguments you pass are changed. Returns the draft id; call publish_draft to apply.',
+            'Update an existing entry by creating a draft of it — the live entry is never modified directly. Identify it with exactly one of entryId (an entry id, or a draft\'s elementId) or draftId (from create_entry/update_entry); editing a draft modifies it in place. Only the arguments you pass are changed. Returns the draft id; call publish_draft to apply.',
             [
-                'entryId' => ['type' => 'integer', 'description' => 'Entry id or draft id.'],
+                'entryId' => ['type' => ['integer', 'null'], 'description' => 'Element id: an entry id from list_entries, or the elementId from create_entry. Not a draftId.'],
+                'draftId' => ['type' => ['integer', 'null'], 'description' => 'Draft id from create_entry or update_entry.'],
                 'fields' => ['type' => 'object', 'additionalProperties' => true, 'description' => WriteTools::FIELDS_DESCRIPTION],
                 'title' => ['type' => ['string', 'null']],
                 'site' => $site(),
                 'parentId' => ['type' => ['integer', 'null'], 'description' => 'Move the entry under this parent, in sections where "isStructure" is true. Pass 0 to move it to the top level. Omit to leave the position unchanged. The move takes effect when the draft is published.'],
             ],
-            ['entryId'],
+            [],
         );
 
         self::_addTool($builder, [WriteTools::class, 'publishDraft'], 'publish_draft',

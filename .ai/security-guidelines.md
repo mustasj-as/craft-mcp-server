@@ -16,11 +16,11 @@ språkmodell.** Trusselbildet er ikke det samme som for en vanlig Craft-modul.
 - `lastUsedAt` oppdateres strupet (maks hvert 60. sekund).
 - Ingen tokens i git, i dokumentasjon eller i eksempler. Bruk `<token>`.
 
-## Tokenet i URL-en er en bevisst avveiing
+## Tokenet i URL-en — finnes fortsatt, vises ikke
 
-`tokenInPath` (standard `true`) registrerer `/<routePath>/t/<token>`. Den
-finnes fordi Claude Desktops «Add custom connector» kun tar imot en URL og
-ikke har noe felt for headere.
+`tokenInPath` (standard `true`) registrerer `/<routePath>/t/<token>`. Den kom
+fordi Claude Desktop en gang bare tok imot en URL. Det gjør den ikke lenger,
+og token-fanen viser bare header-oppskrifter (ADR 0006).
 
 **Tokenet havner da i access-logger, proxy-logger og nettleserhistorikk.** Det
 er akseptert for et internt verktøy, men det er en reell eksponering:
@@ -110,3 +110,19 @@ praktiske gevinsten ved å publisere.
 **Endepunktet hører ikke på et offentlig nettsted uten at noen har tenkt
 gjennom det.** Lokalt og på staging er det udramatisk; i prod er det et
 autentisert skrive-API mot innholdet.
+
+## Token-fanen
+
+- **Tokens lages bare av brukeren selv.** En admin som laget et token på en
+  annens fane, fikk se klarteksten og kunne opptre som den brukeren. Admin
+  kan fortsatt trekke tilbake andres tokens.
+- **Gyldighet er påkrevd** fra en fast liste, maks 12 mnd. Tokens uten utløp
+  kan bare lages fra konsollen (`tokens/create` uten `--expiresDays`).
+- **Mister en bruker tilgangen, trekkes tokenene tilbake** — se Tilgangssynk
+  i [architecture.md](architecture.md). Endepunktet avviser dem uansett;
+  slettingen hindrer at glemte tokens virker igjen den dagen tilgangen gis
+  tilbake.
+- Bryteren «Kan bruke MCP» endrer bare permission på brukernivå. Den leser
+  brukernivå-lista fra tabellen og skriver den tilbake — ikke fra
+  `getPermissionsByUserId()`, som inkluderer gruppenes og ville kopiert dem
+  inn på brukeren.
