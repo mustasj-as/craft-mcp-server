@@ -4,6 +4,7 @@ namespace Mustasj\CraftMcp\controllers;
 
 use Craft;
 use craft\web\Controller;
+use Mcp\Server\Transport\Http\Middleware\DnsRebindingProtectionMiddleware;
 use Mcp\Server\Transport\StreamableHttpTransport;
 use Mustasj\CraftMcp\Module;
 use Mustasj\CraftMcp\services\ServerFactory;
@@ -116,7 +117,7 @@ class ServerController extends Controller
         $psrRequest = $creator->fromGlobals()
             ->withBody($psr17->createStream($this->request->getRawBody()));
 
-        $transport = new StreamableHttpTransport($psrRequest, $psr17, $psr17);
+        $transport = new StreamableHttpTransport($psrRequest, $psr17, $psr17, middleware: $this->_middleware($psr17));
 
         /** @var \Psr\Http\Message\ResponseInterface $psrResponse */
         $psrResponse = ServerFactory::create()->run($transport);
@@ -137,5 +138,42 @@ class ServerController extends Controller
         $response->content = (string)$psrResponse->getBody();
 
         return $response;
+    }
+
+    // =========================================================================
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * SDK-ens standard-middleware, med DNS rebinding-vernet utvidet til
+     * sitenes egne vertsnavn.
+     *
+     * Standardvernet godtar bare localhost, så uten dette svarer endepunktet
+     * 403 på ethvert ekte domene. Resten av standardstakken (CORS, og i 0.7
+     * protokollversjon) beholdes som SDK-en definerer den.
+     *
+     * @param Psr17Factory $psr17
+     * @return array<\Psr\Http\Server\MiddlewareInterface>
+     */
+    private function _middleware(Psr17Factory $psr17): array
+    {
+        $hosts = ['localhost', '127.0.0.1', '[::1]', ...Module::getInstance()->allowedHosts];
+
+        foreach (Craft::$app->getSites()->getAllSites() as $site) {
+            $host = parse_url((string)$site->getBaseUrl(), PHP_URL_HOST);
+
+            if (is_string($host) && $host !== '') {
+                $hosts[] = $host;
+            }
+        }
+
+        $hosts = array_values(array_unique(array_map('strtolower', $hosts)));
+
+        return array_map(
+            static fn($middleware) => $middleware instanceof DnsRebindingProtectionMiddleware
+                ? new DnsRebindingProtectionMiddleware($hosts, $psr17, $psr17)
+                : $middleware,
+            StreamableHttpTransport::defaultMiddleware(),
+        );
     }
 }

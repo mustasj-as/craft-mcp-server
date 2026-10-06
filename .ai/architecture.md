@@ -7,7 +7,7 @@
 | Form | Yii-modul distribuert som Composer-pakke (`type: library`) — **ikke** en Craft-plugin, se [ADR 0002](decisions/0002-modul-ikke-plugin.md) |
 | PHP | ≥ 8.2 (`platform` pinnet til 8.2 i `composer.json`) |
 | Craft | `craftcms/cms ^5.0` |
-| MCP | `mcp/sdk ^0.4` |
+| MCP | `mcp/sdk ^0.7 || ^0.8` |
 | PSR-7 | `nyholm/psr7`, `nyholm/psr7-server` |
 | Discovery | `symfony/finder` |
 | Namespace | `Mustasj\CraftMcp\` → `src/` |

@@ -60,6 +60,7 @@ php craft mcp-api/tokens/create <brukernavn>
 | `categoryGroups` | `[]` | Kategorigrupper som eksponeres |
 | `fieldNotes` | `[]` | Felthandle → merknad, for felt der lagret verdi ≠ vist verdi |
 | `toolPaths` | `[]` | Mapper med prosjektets egne verktøyklasser |
+| `allowedHosts` | `[]` | Ekstra vertsnavn som godtas i `Host`/`Origin`. Vertsnavnene fra sitenes base-URL-er godtas alltid; resten avvises (vern mot DNS rebinding) |
 
 ### `sections` — policy per operasjon, ikke per seksjon
 
