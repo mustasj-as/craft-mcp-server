@@ -71,7 +71,7 @@ class ServerFactory extends Component
 
         $builder = Server::builder()
             ->setServerInfo($module->serverName, $module->serverVersion, $module->serverDescription)
-            ->setSession(new FileSessionStore($sessionDir, self::SESSION_TTL), ttl: self::SESSION_TTL);
+            ->setSession(new FileSessionStore($sessionDir, self::SESSION_TTL));
 
         $instructions = self::_instructions($module);
 
