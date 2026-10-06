@@ -117,6 +117,11 @@ class ServerController extends Controller
         $psrRequest = $creator->fromGlobals()
             ->withBody($psr17->createStream($this->request->getRawBody()));
 
+        // `fromGlobals()` legger inn Host både fra URI-en og fra headerne.
+        // SDK-ens DNS rebinding-vern leser `getHeaderLine('Host')`, og «a, a»
+        // matcher ingen vert. Ulike verdier blir stående og avvises.
+        $psrRequest = $psrRequest->withHeader('Host', array_values(array_unique($psrRequest->getHeader('Host'))));
+
         $transport = new StreamableHttpTransport($psrRequest, $psr17, $psr17, middleware: $this->_middleware($psr17));
 
         /** @var \Psr\Http\Message\ResponseInterface $psrResponse */
