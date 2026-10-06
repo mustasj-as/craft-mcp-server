@@ -5,7 +5,7 @@ språkmodell.** Trusselbildet er ikke det samme som for en vanlig Craft-modul.
 
 ## Tokens
 
-- Lagres **kun som sha256-hash** i `{{%mcp_tokens}}`. Klartekst vises én gang.
+- Lagres **kun som sha256-hash** i `{{%craft_mcp_tokens}}` (`{{%mcp_tokens}}` før 1.4.0, flyttes automatisk). Klartekst vises én gang.
 - Formen er `<prefiks>` + 48 hex-tegn (24 tilfeldige byte fra
   `random_bytes()`).
 - `tokenPrefix` **må være unikt per prosjekt.** Ikke bare kosmetikk: prefikset
