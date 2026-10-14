@@ -179,6 +179,15 @@ class Module extends BaseModule
      */
     public array $toolPaths = [];
 
+    /**
+     * @var string[] Ekstra vertsnavn endepunktet godtar i `Host`/`Origin`
+     *
+     * SDK-en avviser alt annet enn localhost som vern mot DNS rebinding.
+     * Vertsnavnene fra alle Craft-sitenes base-URL-er godtas automatisk;
+     * her legges andre til, f.eks. et domene bak en proxy.
+     */
+    public array $allowedHosts = [];
+
     // =========================================================================
     // Public Methods
     // =========================================================================

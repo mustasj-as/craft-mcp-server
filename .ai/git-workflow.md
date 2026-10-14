@@ -2,19 +2,17 @@
 
 ## Hva repoet faktisk gjør
 
-**Trunk-basert, med tagger.** Én langlevd branch, `main`, som til enhver tid er
-det installasjonene henter. Ingen `develop`.
-
-Dette **avviker fra gitflow-standarden** i teamets `.ai`-mal, og det er
-bevisst: pakken er liten (17 filer), har få bidragsytere, og har ingen
-release-kandidat-fase å koordinere. En `develop` uten integrasjonsbehov gir
-bare et ekstra merge-steg. Vokser pakken eller får flere samtidige
-arbeidsstrømmer, er gitflow riktig — da hører det en ny ADR.
+**`develop` for integrasjon, `main` for utgivelser.** Merge til `main`
+publiserer på Packagist, så `main` får bare kode som er røyktestet fra
+`develop`. Se [ADR 0008](decisions/0008-develop-for-publisering.md) — repoet
+var trunk-basert til 2026-10-06.
 
 ## Brancher
 
 Arbeid som er større enn en commit går på `feature/<kort-kebab-beskrivelse>`
-fra `main`, og merges tilbake dit.
+eller `bugfix/…` fra `develop`, og merges tilbake dit. `develop` merges til
+`main` etter røyktest i minst ett prosjekt (`composer require
+mustasj/craft-mcp-server:dev-develop`).
 
 ```
 feature/oauth-stoette

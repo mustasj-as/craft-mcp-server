@@ -40,7 +40,16 @@ class Tokens extends Component
     /**
      * @var string Tabellen tokens lagres i
      */
-    public const TABLE = '{{%mcp_tokens}}';
+    public const TABLE = '{{%craft_mcp_tokens}}';
+
+    /**
+     * @var string Tabellnavnet før 1.4.0, flyttes av {@see ensureTable()}
+     *
+     * `stimmt/craft-mcp` bruker samme navn med en annen struktur. Med begge
+     * installert feilet tokenopprettelsen, og pakkene kunne lest hverandres
+     * rader.
+     */
+    private const LEGACY_TABLE = '{{%mcp_tokens}}';
 
     /**
      * @var int Lengden på hex-delen av et token
@@ -99,6 +108,11 @@ class Tokens extends Component
         $rawTable = $db->getSchema()->getRawTableName(self::TABLE);
         $indexName = $rawTable . '_tokenHash_unq';
         $fkName = $rawTable . '_userId_fk';
+
+        if (!$db->tableExists(self::TABLE) && $this->_isOwnLegacyTable()) {
+            $db->createCommand()->renameTable(self::LEGACY_TABLE, self::TABLE)->execute();
+            $db->getSchema()->refresh();
+        }
 
         if ($db->tableExists(self::TABLE)) {
             $this->_repairTable($indexName, $fkName);
@@ -345,6 +359,22 @@ class Tokens extends Component
     // =========================================================================
     // Private Methods
     // =========================================================================
+
+    /**
+     * Om {@see LEGACY_TABLE} er pakkens egen tabell fra før 1.4.0.
+     *
+     * @return bool
+     */
+    private function _isOwnLegacyTable(): bool
+    {
+        $tableSchema = Craft::$app->getDb()->getSchema()->getTableSchema(self::LEGACY_TABLE);
+
+        // `expiresAt` skiller pakkens tabell fra stimmts, som har `expiryDate`
+        // og `scope`. Stimmts tabell skal aldri røres.
+        return $tableSchema !== null
+            && $tableSchema->getColumn('expiresAt') !== null
+            && $tableSchema->getColumn('scope') === null;
+    }
 
     /**
      * Legger på indeksen og fremmednøkkelen hvis tabellen finnes uten dem.

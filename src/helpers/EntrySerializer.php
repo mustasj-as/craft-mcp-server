@@ -79,7 +79,7 @@ class EntrySerializer
      */
     public static function summarize(Entry $entry): array
     {
-        return [
+        $data = [
             'id' => $entry->id,
             'title' => $entry->title,
             'slug' => $entry->slug,
@@ -87,6 +87,12 @@ class EntrySerializer
             'url' => $entry->getUrl(),
             'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
         ];
+
+        if ($entry->getIsDraft()) {
+            $data['draftId'] = $entry->draftId;
+        }
+
+        return $data;
     }
 
     // =========================================================================

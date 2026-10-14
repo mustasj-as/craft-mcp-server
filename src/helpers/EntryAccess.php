@@ -29,7 +29,9 @@ class EntryAccess
      * Sjekker at den autentiserte brukeren kan se en entry som ikke er live.
      *
      * Publiserte entries slipper gjennom uten sjekk — de er offentlige på
-     * nettstedet uansett.
+     * nettstedet uansett. Utkast gjør aldri det: et utkast av en publisert
+     * entry arver `postDate` og rapporterer derfor status `live`, men
+     * innholdet er ikke publisert.
      *
      * @param Entry $entry
      * @return Entry
@@ -37,7 +39,7 @@ class EntryAccess
      */
     public static function requireViewable(Entry $entry): Entry
     {
-        if ($entry->getStatus() === Entry::STATUS_LIVE) {
+        if (!$entry->getIsDraft() && $entry->getStatus() === Entry::STATUS_LIVE) {
             return $entry;
         }
 
