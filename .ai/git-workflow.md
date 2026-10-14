@@ -14,6 +14,11 @@ eller `bugfix/…` fra `develop`, og merges tilbake dit. `develop` merges til
 `main` etter røyktest i minst ett prosjekt (`composer require
 mustasj/craft-mcp-server:dev-develop`).
 
+Ett internt prosjekt står fast på `dev-develop` som testinstallasjon — se
+glossary.md for hvilket begrep det går under, og spør teamet om navnet.
+Kundeprosjekter står på en tagget versjon (`^1.4`), aldri `dev-develop`:
+`composer update` der skal ikke kunne dra inn uutgitt kode.
+
 ```
 feature/oauth-stoette
 feature/resources-fra-ai-mappa
