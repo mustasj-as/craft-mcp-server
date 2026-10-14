@@ -4,7 +4,7 @@ Formatet følger [Keep a Changelog](https://keepachangelog.com/), og pakken
 bruker [semver](https://semver.org/). Konfigurasjonsnøklene i `config/app.php`
 er en del av det offentlige API-et.
 
-## 1.4.0 — ikke utgitt
+## 1.4.0 — 2026-10-14
 
 ### Før du oppdaterer
 
