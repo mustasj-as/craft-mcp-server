@@ -4,6 +4,21 @@ Formatet følger [Keep a Changelog](https://keepachangelog.com/), og pakken
 bruker [semver](https://semver.org/). Konfigurasjonsnøklene i `config/app.php`
 er en del av det offentlige API-et.
 
+## 1.4.1 — planlagt
+
+Funn fra røyktesten av 1.4.0. Ingen av dem blokkerte utgivelsen.
+
+- **Protokollversjonen forhandles ikke på `mcp/sdk` 0.7.** SDK 0.7 svarer på
+  `initialize` med sin nyeste versjon (`2025-11-25`) uansett hva klienten ba
+  om (`2025-06-18`), mot MCP-spesifikasjonen. SDK 0.8.1 svarer riktig. Enten
+  krev `^0.8` når `stimmt/craft-mcp` ikke lenger holder prosjekter på 0.7,
+  eller sett `setProtocolVersion()` fra requestens `protocolVersion` i
+  `ServerFactory::create()` (serveren bygges per request, så det går). Meld
+  det også til SDK-en.
+- **`serverVersion` har `'1.0.0'` som standard.** Klienten ser da `1.0.0`
+  uansett pakkeversjon. Hent standarden fra `Composer\InstalledVersions`, og
+  la konfigurasjonen fortsatt overstyre.
+
 ## 1.4.0 — 2026-10-14
 
 ### Før du oppdaterer
