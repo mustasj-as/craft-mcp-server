@@ -139,7 +139,7 @@ class ServerFactory extends Component
         ];
 
         self::_addTool($builder, [ArticleTools::class, 'listArticles'], 'list_entries',
-            'List entries in a section, newest first. Returns compact summaries (id, title, slug, status, url, postDate) and the total count; use get_entry for full content. Use limit/offset to page through large sections. Pass drafts: true to list new, never-published drafts (e.g. from create_entry) instead of published entries; their summaries include draftId.',
+            'List entries in a section, newest first. Returns compact summaries (id, title, slug, status, url, postDate, dateUpdated) and the total count; use get_entry for full content. Use limit/offset to page through large sections. Pass drafts: true to list new, never-published drafts (e.g. from create_entry) instead of published entries; their summaries include draftId.',
             [
                 'section' => ['type' => 'string', 'enum' => $readable],
                 'query' => ['type' => ['string', 'null'], 'description' => 'Free-text search across the entry\'s searchable content.'],
@@ -152,13 +152,25 @@ class ServerFactory extends Component
         );
 
         self::_addTool($builder, [ArticleTools::class, 'getArticle'], 'get_entry',
-            'Get one entry in full, by id, slug or draftId, including all fields and content blocks. Drafts are found by id (the elementId from create_entry) or by draftId; slug only finds published entries.',
+            'Get one entry in full, by id, slug or draftId, including all fields and content blocks, plus dateCreated, dateUpdated and expiryDate. dateUpdated moves on every save, including resave commands and migrations; use get_entry_history to see who changed what and when. Drafts are found by id (the elementId from create_entry) or by draftId; slug only finds published entries.',
             [
                 'section' => ['type' => 'string', 'enum' => $readable],
                 'id' => ['type' => ['integer', 'null'], 'description' => 'Entry id (from list_entries), or a draft\'s elementId.'],
                 'slug' => ['type' => ['string', 'null'], 'description' => 'Entry slug. Slugs can differ per site.'],
                 'site' => $site(),
                 'draftId' => ['type' => ['integer', 'null'], 'description' => 'Draft id (from create_entry or update_entry).'],
+            ],
+            ['section'],
+        );
+
+        self::_addTool($builder, [ArticleTools::class, 'getEntryHistory'], 'get_entry_history',
+            'Get the latest revisions of a published entry, newest first: when each was saved, the display name of who saved it, the revision notes, and whether the entry was enabled on the site in that revision. Use it to answer "when and by whom was this changed or disabled?" — dateUpdated in get_entry cannot, since resave commands and migrations also move it. The first revision where "enabled" goes from true to false is the one that disabled the entry. Saving in the control panel, including the element index\'s bulk status action, creates a revision; resave commands, migrations and scripts do not, and can change the status silently. "creator" is null when the revision was made without a logged-in user, or the user has no full name. If the entry is disabled but its latest revision is enabled, it was disabled outside the revision system after that revision\'s date — not "always disabled". The response says so in "note".',
+            [
+                'section' => ['type' => 'string', 'enum' => $readable],
+                'id' => ['type' => ['integer', 'null'], 'description' => 'Entry id (from list_entries). Drafts have no revision history.'],
+                'slug' => ['type' => ['string', 'null'], 'description' => 'Entry slug. Slugs can differ per site.'],
+                'site' => $site('Revision status ("enabled") is per site.'),
+                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 20, 'description' => 'Number of revisions (1-20). Default 5.'],
             ],
             ['section'],
         );

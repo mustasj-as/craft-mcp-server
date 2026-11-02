@@ -107,7 +107,7 @@ trenger ett eget verktøy forke pakken.
 
 ## Verktøy
 
-`list_entries`, `get_entry`, `create_entry`, `update_entry`, `publish_draft`,
+`list_entries`, `get_entry`, `get_entry_history`, `create_entry`, `update_entry`, `publish_draft`,
 `list_categories`, `get_content_model`, `search_assets`, `list_asset_folders`,
 `update_asset`.
 
