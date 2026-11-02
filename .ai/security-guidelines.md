@@ -84,6 +84,9 @@ Wishlist-/favorittdata skal ikke over MCP.** Persondata over et AI-endepunkt
 er en annen samtale enn innholdsredigering, med andre krav. Utvid ikke scope
 hit uten en ADR.
 
+Eneste unntak: `get_entry_history` viser **fullt navn** på den som lagret en
+revisjon, aldri e-post, brukernavn eller id (ADR 0009).
+
 Globals kan vurderes senere; entries og kategorier er dagens scope.
 
 ## Distribusjon

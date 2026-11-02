@@ -4,6 +4,7 @@ namespace Mustasj\CraftMcp\tools;
 
 use Craft;
 use craft\elements\Entry;
+use DateTimeInterface;
 use Mcp\Exception\ToolCallException;
 use Mustasj\CraftMcp\helpers\EntryAccess;
 use Mustasj\CraftMcp\helpers\EntrySerializer;
@@ -138,5 +139,139 @@ class ArticleTools
         }
 
         return EntrySerializer::serialize(EntryAccess::requireViewable($entry));
+    }
+
+    /**
+     * Henter de siste revisjonene av en entry: når, av hvem, og om entryen
+     * var slått på i den revisjonen.
+     *
+     * Svarer på «når og av hvem ble denne endret / slått av?», som
+     * `dateUpdated` alene ikke kan: den flyttes også av resave og migreringer.
+     * `creator` er bare visningsnavnet (ADR 0009).
+     *
+     * @param string $section Seksjonshandle, fra de konfigurerte seksjonene
+     * @param int|null $id Entry-ID (ikke utkast)
+     * @param string|null $slug Entry-slug (alternativ til id)
+     * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
+     * @param int $limit Antall revisjoner, nyeste først (1–20)
+     * @return array
+     */
+    public function getEntryHistory(
+        string $section,
+        ?int $id = null,
+        ?string $slug = null,
+        ?string $site = null,
+        int $limit = 5,
+    ): array {
+        $site ??= SiteHelper::defaultKey();
+
+        if ($id === null && $slug === null) {
+            throw new ToolCallException('Provide "id" or "slug".');
+        }
+
+        SectionPolicy::assertAllowed($section, SectionPolicy::READ);
+
+        $siteHandle = SiteHelper::resolve($site)->handle;
+        $query = Entry::find()
+            ->section($section)
+            ->site($siteHandle)
+            ->status(null);
+
+        if ($id !== null) {
+            $query->id($id);
+        }
+
+        if ($slug !== null) {
+            $query->slug($slug);
+        }
+
+        $entry = $query->one();
+
+        if ($entry === null) {
+            $what = $id !== null ? "id $id" : "slug \"$slug\"";
+            throw new ToolCallException(sprintf('Entry not found (%s) in section "%s" on site "%s". Drafts have no revision history; pass the published entry\'s id.', $what, $section, $site));
+        }
+
+        EntryAccess::requireViewable($entry);
+
+        $revisionQuery = Entry::find()
+            ->revisionOf($entry)
+            ->site($siteHandle)
+            ->status(null);
+
+        $totalRevisions = (int)(clone $revisionQuery)->count();
+
+        /** @var Entry[] $revisions */
+        $revisions = $revisionQuery
+            ->orderBy(['elements.dateCreated' => SORT_DESC, 'elements.id' => SORT_DESC])
+            ->limit(min(max($limit, 1), 20))
+            ->all();
+
+        $enabled = self::_isEnabled($entry);
+
+        return [
+            'id' => $entry->id,
+            'title' => $entry->title,
+            'status' => $entry->getStatus(),
+            'enabled' => $enabled,
+            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
+            'totalRevisions' => $totalRevisions,
+            'revisions' => array_map(static fn(Entry $revision) => [
+                'num' => $revision->revisionNum,
+                'date' => $revision->dateCreated?->format(DateTimeInterface::ATOM),
+                // Bare fullt navn, aldri e-post, brukernavn eller id (ADR 0009).
+                // Ikke getName(): den faller tilbake til brukernavnet, som
+                // ofte er e-postadressen.
+                'creator' => $revision->getCreator()?->fullName ?: null,
+                'notes' => $revision->revisionNotes,
+                'enabled' => self::_isEnabled($revision),
+            ], $revisions),
+            'note' => self::_historyNote($enabled, $revisions[0] ?? null),
+        ];
+    }
+
+    // =========================================================================
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * Om entryen er slått på for siten den er hentet på.
+     *
+     * Begge nivåene må sjekkes: med én site setter Craft (og `resave
+     * --setEnabledForSite`) `enabled` på elementet, mens per-site-verdien
+     * blir stående `true`.
+     *
+     * @param Entry $entry
+     * @return bool
+     */
+    private static function _isEnabled(Entry $entry): bool
+    {
+        return $entry->enabled && $entry->getEnabledForSite() !== false;
+    }
+
+    /**
+     * Forklarer avvik mellom entryens status og siste revisjon, så agenten
+     * ikke trekker feil slutning av en historikk med hull.
+     *
+     * @param bool $enabled
+     * @param Entry|null $latest
+     * @return string|null
+     */
+    private static function _historyNote(bool $enabled, ?Entry $latest): ?string
+    {
+        if ($latest === null) {
+            return 'No revisions found. The section may not have versioning enabled, or the entry has never been saved in a way that creates one.';
+        }
+
+        if ($enabled !== self::_isEnabled($latest)) {
+            return sprintf(
+                'The entry is currently %s, but its latest revision is %s: the status was changed without creating a revision (a resave command, a migration or a script), some time after %s.',
+                $enabled ? 'enabled' : 'disabled',
+                $enabled ? 'disabled' : 'enabled',
+                $latest->dateCreated?->format(DateTimeInterface::ATOM),
+            );
+        }
+
+        return null;
     }
 }

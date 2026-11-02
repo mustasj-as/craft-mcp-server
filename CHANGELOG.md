@@ -4,6 +4,17 @@ Formatet følger [Keep a Changelog](https://keepachangelog.com/), og pakken
 bruker [semver](https://semver.org/). Konfigurasjonsnøklene i `config/app.php`
 er en del av det offentlige API-et.
 
+## Uutgitt
+
+### Lagt til
+
+- **`get_entry_history`**: de siste revisjonene av en entry, med dato, fullt
+  navn på den som lagret, notater og om entryen var slått på. Svarer på «når
+  og av hvem ble denne slått av?». Sier fra i `note` når statusen er endret
+  uten revisjon (resave, migreringer). ADR 0009.
+- **`get_entry`** gir `dateCreated`, `dateUpdated` og `expiryDate`;
+  **`list_entries`** gir `dateUpdated`.
+
 ## 1.4.1 — planlagt
 
 Funn fra røyktesten av 1.4.0. Ingen av dem blokkerte utgivelsen.
