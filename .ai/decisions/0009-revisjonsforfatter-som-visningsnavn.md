@@ -43,7 +43,7 @@ brukerdata ikke skal over MCP uten en ADR. Dette er den ADR-en.
 | Hvordan statusen endres | Revisjon? |
 |---|---|
 | Lagring i CP-en | Ja |
-| Bulk-handlingen «Status» i indeksen (`SetStatus` → `saveElement`) | Ja (lest i koden, ikke kjørt) |
+| Bulk-handlingen «Status» i indeksen (`SetStatus` → `saveElement`) | Ja (kjørt i et annet prosjekt, også Craft 5.9) |
 | `saveElement()` fra et skript uten `resaving` | Ja, med innlogget bruker som forfatter, ellers `creator: null` |
 | `php craft resave/entries --setEnabledForSite=0` | Nei, og `dateUpdated` flyttes heller ikke |
 
