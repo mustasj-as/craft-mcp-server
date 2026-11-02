@@ -15,6 +15,13 @@ er en del av det offentlige API-et.
 - **`get_entry`** gir `dateCreated`, `dateUpdated` og `expiryDate`;
   **`list_entries`** gir `dateUpdated`.
 
+### Endret
+
+- **`serverVersion` er `null` som standard**, og klienten får da den
+  installerte pakkeversjonen fra Composer (`1.5.0`, eller
+  `dev-develop@<commit>`) i stedet for alltid `1.0.0`. Satt i `config/app.php`
+  vinner den fortsatt.
+
 ## 1.4.1 — planlagt
 
 Funn fra røyktesten av 1.4.0. Ingen av dem blokkerte utgivelsen.
@@ -25,10 +32,8 @@ Funn fra røyktesten av 1.4.0. Ingen av dem blokkerte utgivelsen.
   krev `^0.8` når `stimmt/craft-mcp` ikke lenger holder prosjekter på 0.7,
   eller sett `setProtocolVersion()` fra requestens `protocolVersion` i
   `ServerFactory::create()` (serveren bygges per request, så det går). Meld
-  det også til SDK-en.
-- **`serverVersion` har `'1.0.0'` som standard.** Klienten ser da `1.0.0`
-  uansett pakkeversjon. Hent standarden fra `Composer\InstalledVersions`, og
-  la konfigurasjonen fortsatt overstyre.
+  det også til SDK-en. Per 2026-11-02 krever `stimmt/craft-mcp` 1.7.1 `^0.8`
+  og 1.8.0 `^0.9`, som denne pakken ikke tillater ennå.
 
 ## 1.4.0 — 2026-10-14
 

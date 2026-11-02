@@ -2,6 +2,7 @@
 
 namespace Mustasj\CraftMcp\services;
 
+use Composer\InstalledVersions;
 use Craft;
 use Mcp\Capability\Discovery\Discoverer;
 use Mcp\Capability\Registry\Loader\DiscoveryLoader;
@@ -59,6 +60,32 @@ class ServerFactory extends Component
     // =========================================================================
 
     /**
+     * Den installerte versjonen av pakken, slik Composer ser den.
+     *
+     * Tagget versjon gir `1.5.0`. En branch gir `dev-develop@f98a358`, så det
+     * går an å se hvilken commit et testprosjekt faktisk kjører.
+     *
+     * @return string
+     */
+    public static function serverVersion(): string
+    {
+        $package = 'mustasj/craft-mcp-server';
+
+        if (!InstalledVersions::isInstalled($package)) {
+            return 'unknown';
+        }
+
+        $version = (string)InstalledVersions::getPrettyVersion($package);
+        $reference = InstalledVersions::getReference($package);
+
+        if (str_starts_with($version, 'dev-') && $reference !== null) {
+            $version .= '@' . substr($reference, 0, 7);
+        }
+
+        return $version;
+    }
+
+    /**
      * Bygger en ferdig konfigurert MCP-server.
      *
      * @return Server
@@ -70,7 +97,7 @@ class ServerFactory extends Component
         $sessionDir = Craft::$app->getPath()->getRuntimePath() . DIRECTORY_SEPARATOR . 'mcp-sessions';
 
         $builder = Server::builder()
-            ->setServerInfo($module->serverName, $module->serverVersion, $module->serverDescription)
+            ->setServerInfo($module->serverName, $module->serverVersion ?? self::serverVersion(), $module->serverDescription)
             ->setSession(new FileSessionStore($sessionDir, self::SESSION_TTL));
 
         $instructions = self::_instructions($module);
