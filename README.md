@@ -49,7 +49,7 @@ php craft mcp-api/tokens/create <brukernavn>
 |---|---|---|
 | `serverName` | `Craft Content API` | Navnet klienten ser i `initialize` |
 | `serverDescription` | generisk | Én setning om hva serveren er |
-| `serverVersion` | `1.0.0` | Rapporteres til klienten |
+| `serverVersion` | `null` | Rapporteres til klienten. Tomt gir den installerte pakkeversjonen (`1.5.0`, eller `dev-develop@<commit>`) |
 | `instructionsPath` | `null` | Markdown-fil med `instructions`. Craft-alias tillatt |
 | `tokenPrefix` | `craft_` | **Må være unikt per prosjekt.** Små bokstaver/tall + `_` |
 | `routePath` | `mcp` | URL-stien endepunktet svarer på |
@@ -107,7 +107,7 @@ trenger ett eget verktøy forke pakken.
 
 ## Verktøy
 
-`list_entries`, `get_entry`, `create_entry`, `update_entry`, `publish_draft`,
+`list_entries`, `get_entry`, `get_entry_history`, `create_entry`, `update_entry`, `publish_draft`,
 `list_categories`, `get_content_model`, `search_assets`, `list_asset_folders`,
 `update_asset`.
 

@@ -58,6 +58,11 @@ class EntrySerializer
             'section' => $entry->getSection()?->handle,
             'entryType' => $entry->getType()->handle,
             'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
+            'expiryDate' => $entry->expiryDate?->format(DateTimeInterface::ATOM),
+            'dateCreated' => $entry->dateCreated?->format(DateTimeInterface::ATOM),
+            // Flyttes av alt som lagrer elementet (resave, migreringer,
+            // propagering), ikke bare redaktører. Se get_entry_history.
+            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
         ];
 
         if ($entry->getIsDraft()) {
@@ -86,6 +91,7 @@ class EntrySerializer
             'status' => $entry->getStatus(),
             'url' => $entry->getUrl(),
             'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
+            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
         ];
 
         if ($entry->getIsDraft()) {

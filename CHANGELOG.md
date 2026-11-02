@@ -4,6 +4,37 @@ Formatet følger [Keep a Changelog](https://keepachangelog.com/), og pakken
 bruker [semver](https://semver.org/). Konfigurasjonsnøklene i `config/app.php`
 er en del av det offentlige API-et.
 
+## Planlagt
+
+Funn fra røyktesten av 1.4.0, ikke med i 1.5.0.
+
+- **Protokollversjonen forhandles ikke på `mcp/sdk` 0.7.** SDK 0.7 svarer på
+  `initialize` med sin nyeste versjon (`2025-11-25`) uansett hva klienten ba
+  om (`2025-06-18`), mot MCP-spesifikasjonen. SDK 0.8.1 svarer riktig. Enten
+  krev `^0.8` når `stimmt/craft-mcp` ikke lenger holder prosjekter på 0.7,
+  eller sett `setProtocolVersion()` fra requestens `protocolVersion` i
+  `ServerFactory::create()` (serveren bygges per request, så det går). Meld
+  det også til SDK-en. Per 2026-11-02 krever `stimmt/craft-mcp` 1.7.1 `^0.8`
+  og 1.8.0 `^0.9`, som denne pakken ikke tillater ennå.
+
+## 1.5.0 — 2026-11-02
+
+### Lagt til
+
+- **`get_entry_history`**: de siste revisjonene av en entry, med dato, fullt
+  navn på den som lagret, notater og om entryen var slått på. Svarer på «når
+  og av hvem ble denne slått av?». Sier fra i `note` når statusen er endret
+  uten revisjon (resave, migreringer). ADR 0009.
+- **`get_entry`** gir `dateCreated`, `dateUpdated` og `expiryDate`;
+  **`list_entries`** gir `dateUpdated`.
+
+### Endret
+
+- **`serverVersion` er `null` som standard**, og klienten får da den
+  installerte pakkeversjonen fra Composer (`1.5.0`, eller
+  `dev-develop@<commit>`) i stedet for alltid `1.0.0`. Satt i `config/app.php`
+  vinner den fortsatt.
+
 ## 1.4.0 — 2026-10-14
 
 ### Før du oppdaterer

@@ -95,9 +95,10 @@ class Module extends BaseModule
     public string $serverDescription = 'Read and write content in Craft CMS';
 
     /**
-     * @var string Versjonen som rapporteres til klienten
+     * @var string|null Versjonen som rapporteres til klienten. Tomt gir den
+     * installerte pakkeversjonen fra Composer, se ServerFactory::serverVersion()
      */
-    public string $serverVersion = '1.0.0';
+    public ?string $serverVersion = null;
 
     /**
      * @var string|null Sti til en markdown-fil med `instructions` for klienten

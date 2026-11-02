@@ -47,6 +47,7 @@ dem, fordi repoet er offentlig:
 | Begrep | Hva det viser til |
 |---|---|
 | **opphavsprosjektet** | Prosjektet modulen ble skrevet for, som `modules/mcp/`. Kjører fortsatt sin egen kopi, og er akseptansetesten for `toolPaths`. Har ECS og PHPStan, som denne koden er skrevet etter |
+| **testprosjektet** | Internt Mustasj-prosjekt som står fast på `dev-develop`, og der `develop` røyktestes før hver utgivelse (ADR 0008). Har tabellprefiks, så tokentabellen heter `craft_craft_mcp_tokens` der — det er riktig |
 | **stresstestprosjektet** | Prosjektet pakken ble generalisert mot: fem sites (to aktive), en ekstern XML-feed som eier en seksjon, en langt større innholdsmodell. De åtte funnene derfra formet konfigurasjonssnittet |
 
 Hvilke kunder det er, står ikke i repoet. Trenger du det, spør noen i teamet.

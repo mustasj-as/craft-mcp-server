@@ -16,8 +16,9 @@ Sannsynligvis er det begrunnet, og som oftest med et målt tall.
 | [0006](0006-token-i-header-som-standard.md) | Tokenet sendes som header; URL-varianten vises ikke lenger | Vedtatt, opphever 0005 delvis |
 | [0007](0007-element-id-og-utkast-id-er-egne-parametere.md) | Element-ID og utkast-ID er egne parametere, og utkast er aldri offentlige | Foreslått |
 | [0008](0008-develop-for-publisering.md) | `develop` som integrasjonsbranch, `main` er publisert | Vedtatt |
+| [0009](0009-revisjonsforfatter-som-visningsnavn.md) | Revisjonshistorikk med forfatterens fulle navn | Vedtatt |
 
-Neste ledige nummer: **0009**.
+Neste ledige nummer: **0010**.
 
 ## Format
 
