@@ -18,7 +18,7 @@ use yii\base\Arrayable;
  *
  * Serialiseringen er generisk: den går gjennom entryens field layout og
  * håndterer verditypene per felttype (Matrix → nestede entries rekursivt,
- * relasjoner → kompakte referanser, CKEditor → HTML-streng, datoer → ISO
+ * relasjoner → kompakte referanser, CKEditor → rå HTML med referansetagger, datoer → ISO
  * 8601). Ukjente objekttyper utelates fremfor å feile.
  *
  * @author Mustasj AS <pal@mustasj.no>
@@ -174,6 +174,16 @@ class EntrySerializer
 
         if (is_array($value)) {
             return array_map(static fn(mixed $item) => self::_serializeValue($item, $depth), $value);
+        }
+
+        // Råinnhold, ikke `(string)`: den parsede HTML-en har byttet
+        // referansetagger som {entry:12@2:url||…} ut med ferdige URL-er. En
+        // klient trodde da at lenkene var hardkodet, og en som skrev HTML-en
+        // tilbake med update_entry gjorde dem faktisk hardkodet — lenken
+        // sluttet å følge slug-endringer. `instanceof` krever ikke at
+        // klassen finnes, så pakken trenger ikke CKEditor som avhengighet.
+        if ($value instanceof \craft\htmlfield\HtmlFieldData) {
+            return $value->getRawContent();
         }
 
         if ($value instanceof \Stringable) {

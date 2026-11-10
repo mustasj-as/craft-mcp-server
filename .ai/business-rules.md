@@ -17,6 +17,20 @@ Unntaket er `update_asset`, som skriver direkte: assets har ikke noe
 utkast-begrep i Craft. Det står i verktøyets egen beskrivelse, slik at
 klienten vet det.
 
+## Referanser i HTML-felt skal overleve en rundtur
+
+`EntrySerializer` leser HTML-felt med `getRawContent()`, ikke `(string)`. Den
+parsede verdien har byttet `{entry:<id>@<siteId>:url||<fallback>}` ut med
+ferdige URL-er, og en klient som leser feltet og skriver det tilbake gjør da
+interne lenker om til hardkodede — de slutter å følge slug-endringer, uten at
+noen ser det. Det som leses ut, skal kunne skrives tilbake uendret.
+
+## Slugs er per site
+
+`update_entry` tar `slug`, og skriveverktøyene advarer (uten å blokkere) når
+en ikke-primær site har samme slug som primærsiten. Pakken lager ingen
+redirect når en slug endres — det er prosjektets sak, og svaret sier fra.
+
 ## Ingenting slettes
 
 Det finnes **ingen `delete_entry`, ingen `delete_asset` og ingen

@@ -223,6 +223,7 @@ class ServerFactory extends Component
                 'draftId' => ['type' => ['integer', 'null'], 'description' => 'Draft id from create_entry or update_entry.'],
                 'fields' => ['type' => 'object', 'additionalProperties' => true, 'description' => WriteTools::FIELDS_DESCRIPTION],
                 'title' => ['type' => ['string', 'null']],
+                'slug' => ['type' => ['string', 'null'], 'description' => 'New slug on this site. Slugs are per site: when writing a translated version, set a slug in that language. Changing a slug does not redirect the old URL.'],
                 'site' => $site(),
                 'parentId' => ['type' => ['integer', 'null'], 'description' => 'Move the entry under this parent, in sections where "isStructure" is true. Pass 0 to move it to the top level. Omit to leave the position unchanged. The move takes effect when the draft is published.'],
             ],
