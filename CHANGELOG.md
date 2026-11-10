@@ -6,16 +6,6 @@ er en del av det offentlige API-et.
 
 ## Planlagt
 
-Funn fra røyktesten av 1.4.0, ikke med i 1.5.0.
-
-- **Protokollversjonen forhandles ikke på `mcp/sdk` 0.7.** SDK 0.7 svarer på
-  `initialize` med sin nyeste versjon (`2025-11-25`) uansett hva klienten ba
-  om (`2025-06-18`), mot MCP-spesifikasjonen. SDK 0.8.1 svarer riktig. Enten
-  krev `^0.8` når `stimmt/craft-mcp` ikke lenger holder prosjekter på 0.7,
-  eller sett `setProtocolVersion()` fra requestens `protocolVersion` i
-  `ServerFactory::create()` (serveren bygges per request, så det går). Meld
-  det også til SDK-en. Per 2026-11-02 krever `stimmt/craft-mcp` 1.7.1 `^0.8`
-  og 1.8.0 `^0.9`, som denne pakken ikke tillater ennå.
 - **`fields: {}` avvises av SDK-valideringen.** PHP dekoder det tomme
   objektet til en array, og skjemaet krever `object`. Funnet ved røyktest
   2026-11-10; utelatt `fields` virker.
@@ -33,6 +23,18 @@ Funn fra røyktesten av 1.4.0, ikke med i 1.5.0.
 
 ### Endret
 
+- **`mcp/sdk ^0.8 || ^0.9`**, ikke lenger `^0.7`. 0.9 er det
+  `stimmt/craft-mcp` 1.8.x krever, så prosjekter med begge kan nå oppgradere
+  den. Å slippe 0.7 retter også protokollforhandlingen: 0.7 svarte på
+  `initialize` med sin nyeste versjon uansett hva klienten ba om.
+  Prosjekter som står på `stimmt/craft-mcp` < 1.7.1 må oppgradere den først.
+- **Fremmed `Origin` gir 403.** Nytt vern i SDK 0.9: en request med
+  `Origin`-header må være samme origin som endepunktet. MCP-klienter sender
+  normalt ikke `Origin`; en nettleserbasert inspektør på et annet domene
+  blir avvist.
+- **`DnsRebindingProtectionMiddleware` får fabrikkene som navngitte
+  argumenter.** SDK 0.9 satte inn `$allowedOrigins` som andre parameter, så
+  det posisjonelle kallet ville gitt TypeError på hver request.
 - **HTML-felt (CKEditor) leses rått.** `get_entry` gir referansetagger som
   `{entry:984:url||https://…}` i stedet for ferdige URL-er. Før så klienten
   bare absolutte lenker, trodde de var hardkodet, og gjorde dem faktisk
