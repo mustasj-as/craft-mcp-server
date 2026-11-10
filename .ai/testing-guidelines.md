@@ -69,6 +69,15 @@ er det ikke. Fra da pakken erstattet kopien i stresstestprosjektet:
 - `get_content_model()` 51 770 tegn → `only: "faq"` 3 439 tegn
 - `initialize` leste 1 277 tegn instruksjoner fra `.ai/mcp/instructions.md`
 
+Fra 1.6.0-røyktesten (2026-11-10, flerspråklig kundeprosjekt, `nb` + `en`):
+
+- `get_entry` (artikkel, `en`) → referansetagger `{entry:984:url||…}` i
+  CKEditor-feltet (var: ferdige URL-er)
+- `update_entry` uten slug på `en` → `warning` om lik slug
+- `update_entry(slug: "<engelsk-slug>")` → ny slug på `en`, `nb` uendret,
+  ingen advarsel
+- Ikke kjørt: `publish_draft` med advarselen (samme hjelpemetode)
+
 ### 5. Rydd opp etter deg
 
 Skrivetester lager ekte utkast. Slett dem, og kjør `php craft gc`.

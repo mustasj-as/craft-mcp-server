@@ -16,6 +16,30 @@ Funn fra røyktesten av 1.4.0, ikke med i 1.5.0.
   `ServerFactory::create()` (serveren bygges per request, så det går). Meld
   det også til SDK-en. Per 2026-11-02 krever `stimmt/craft-mcp` 1.7.1 `^0.8`
   og 1.8.0 `^0.9`, som denne pakken ikke tillater ennå.
+- **`fields: {}` avvises av SDK-valideringen.** PHP dekoder det tomme
+  objektet til en array, og skjemaet krever `object`. Funnet ved røyktest
+  2026-11-10; utelatt `fields` virker.
+
+## Uutgitt (1.6.0)
+
+### Lagt til
+
+- **`update_entry` tar `slug`.** Slugs er per site, men en oversatt versjon
+  arvet slugen fra siten entryen ble opprettet på, og verktøyet hadde ingen
+  måte å endre den på.
+- **Advarsel om lik slug.** `create_entry`, `update_entry` og `publish_draft`
+  gir `warning` når slugen på en ikke-primær site er lik primærsitens.
+  Blokkerer ikke — noen slugs er med vilje like.
+
+### Endret
+
+- **HTML-felt (CKEditor) leses rått.** `get_entry` gir referansetagger som
+  `{entry:984:url||https://…}` i stedet for ferdige URL-er. Før så klienten
+  bare absolutte lenker, trodde de var hardkodet, og gjorde dem faktisk
+  hardkodet hvis den skrev HTML-en tilbake med `update_entry`. Feltet er
+  fortsatt en streng, så formen på svaret er uendret.
+  `FIELDS_DESCRIPTION` ber klienten beholde taggene og bruke dem for nye
+  interne lenker.
 
 ## 1.5.0 — 2026-11-02
 
