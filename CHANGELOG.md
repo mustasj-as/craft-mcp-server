@@ -10,7 +10,7 @@ er en del av det offentlige API-et.
   objektet til en array, og skjemaet krever `object`. Funnet ved røyktest
   2026-11-10; utelatt `fields` virker.
 
-## Uutgitt (1.6.0)
+## 1.6.0 — 2026-11-10
 
 ### Lagt til
 
