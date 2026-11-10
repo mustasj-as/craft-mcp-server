@@ -77,6 +77,10 @@ Fra 1.6.0-røyktesten (2026-11-10, flerspråklig kundeprosjekt, `nb` + `en`):
 - `update_entry(slug: "<engelsk-slug>")` → ny slug på `en`, `nb` uendret,
   ingen advarsel
 - Ikke kjørt: `publish_draft` med advarselen (samme hjelpemetode)
+- Samme prosjekt på `mcp/sdk` 0.9.0 + `stimmt/craft-mcp` 1.8.1:
+  `initialize` med `2025-06-18` → svar `2025-06-18` (0.7: `2025-11-25`);
+  `tools/list` 13 verktøy, to av dem prosjektets egne; `Origin` fra eget
+  domene → 200, fremmed → 403
 
 ### 5. Rydd opp etter deg
 

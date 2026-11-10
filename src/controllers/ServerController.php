@@ -154,8 +154,7 @@ class ServerController extends Controller
      * sitenes egne vertsnavn.
      *
      * Standardvernet godtar bare localhost, så uten dette svarer endepunktet
-     * 403 på ethvert ekte domene. Resten av standardstakken (CORS, og i 0.7
-     * protokollversjon) beholdes som SDK-en definerer den.
+     * 403 på ethvert ekte domene. Resten av standardstakken (CORS) beholdes som SDK-en definerer den.
      *
      * @param Psr17Factory $psr17
      * @return array<\Psr\Http\Server\MiddlewareInterface>
@@ -184,7 +183,11 @@ class ServerController extends Controller
 
         return array_map(
             static fn($middleware) => $middleware instanceof DnsRebindingProtectionMiddleware
-                ? new DnsRebindingProtectionMiddleware($hosts, $psr17, $psr17)
+                // Navngitt, ikke posisjonelt: SDK 0.9 satte inn `$allowedOrigins`
+                // som andre argument, og fabrikken havnet der med TypeError på
+                // hver request. Origin-lista står tom med vilje — samme-origin
+                // er alltid lov, og MCP-klienter sender sjelden Origin.
+                ? new DnsRebindingProtectionMiddleware($hosts, responseFactory: $psr17, streamFactory: $psr17)
                 : $middleware,
             StreamableHttpTransport::defaultMiddleware(),
         );
