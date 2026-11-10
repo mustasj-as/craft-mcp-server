@@ -32,7 +32,7 @@ class WriteTools
     /**
      * @var string Beskrivelse brukt for `fields`-parametrene
      */
-    public const FIELDS_DESCRIPTION = 'Field values keyed by field handle (see get_content_model). Matrix fields: array of blocks [{"type": "<entryTypeHandle>", "title": "...", "fields": {...}}] — replaces the entire field content; include existing block ids as {"id": 123, ...} to keep them, and omit "title" for block types without a title field. Blocks nest: a Matrix field inside a block\'s "fields" takes the same array-of-blocks shape. Category fields: array of slugs. Asset/entry relation fields: array of element ids.';
+    public const FIELDS_DESCRIPTION = 'Field values keyed by field handle (see get_content_model). Rich text (HTML) fields are read and written raw: internal links appear as reference tags like {entry:<id>@<siteId>:url||<fallback-url>} — keep them as they are, and use the same form for new links to entries on this site instead of absolute URLs. Matrix fields: array of blocks [{"type": "<entryTypeHandle>", "title": "...", "fields": {...}}] — replaces the entire field content; include existing block ids as {"id": 123, ...} to keep them, and omit "title" for block types without a title field. Blocks nest: a Matrix field inside a block\'s "fields" takes the same array-of-blocks shape. Category fields: array of slugs. Asset/entry relation fields: array of element ids.';
 
     // =========================================================================
     // Public Methods
@@ -111,6 +111,7 @@ class WriteTools
      * @param string|null $site Språkkode. Utelatt gir standard-siten, se SiteHelper::defaultKey()
      * @param int|null $parentId Ny forelder i structure-seksjoner (0 = flytt til toppnivå)
      * @param int|null $draftId Utkast-ID fra create_entry/update_entry (alternativ til entryId)
+     * @param string|null $slug Ny slug på denne siten (siden 1.6.0)
      * @return array
      * @throws \Throwable
      */
@@ -121,6 +122,7 @@ class WriteTools
         ?string $site = null,
         ?int $parentId = null,
         ?int $draftId = null,
+        ?string $slug = null,
     ): array {
         $site ??= SiteHelper::defaultKey();
 
@@ -168,6 +170,14 @@ class WriteTools
 
         if ($title !== null) {
             $draft->title = $title;
+        }
+
+        // Craft lager ikke ny slug når tittelen endres på en entry som har
+        // en fra før, så uten denne arvet oversatte versjoner slugen fra
+        // siten entryen ble opprettet på (`/en/…/<norsk-slug>`), og det
+        // fantes ingen vei rundt det over MCP.
+        if ($slug !== null) {
+            $draft->slug = $slug;
         }
 
         if ($parentId !== null) {
@@ -237,12 +247,20 @@ class WriteTools
         /** @var Entry $entry */
         $entry = Craft::$app->getDrafts()->applyDraft($draft);
 
-        return [
+        $result = [
             'id' => $entry->id,
             'title' => $entry->title,
             'status' => $entry->getStatus(),
             'url' => $entry->getUrl(),
         ];
+
+        $warning = $this->_slugWarning($entry);
+
+        if ($warning !== null) {
+            $result['warning'] = $warning;
+        }
+
+        return $result;
     }
 
     // =========================================================================
@@ -381,7 +399,7 @@ class WriteTools
      */
     private function _draftResult(Entry $draft): array
     {
-        return [
+        $result = [
             'draftId' => $draft->draftId,
             'elementId' => $draft->id,
             'canonicalId' => $draft->getIsUnpublishedDraft() ? null : $draft->getCanonicalId(),
@@ -391,5 +409,50 @@ class WriteTools
                 ? 'Draft saved. Call publish_draft with draftId to make it live. Read it back with get_entry (draftId), change it with update_entry (draftId). In the control panel, new drafts only appear in the entry list when the "Drafts" status filter is selected — or open cpEditUrl directly.'
                 : 'Draft saved. Call publish_draft with draftId to make it live, or review it in the control panel via cpEditUrl.',
         ];
+
+        $warning = $this->_slugWarning($draft);
+
+        if ($warning !== null) {
+            $result['warning'] = $warning;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Advarer når slugen på en ikke-primær site er lik primærsitens.
+     *
+     * Blokkerer ikke: noen slugs er med vilje like på alle språk. Men det
+     * vanlige tilfellet er en oversettelse som har arvet slugen, og det ser
+     * ingen før URL-en står live på feil språk.
+     *
+     * @param Entry $entry Entryen eller utkastet som nettopp ble lagret
+     * @return string|null
+     */
+    private function _slugWarning(Entry $entry): ?string
+    {
+        $primarySite = Craft::$app->getSites()->getPrimarySite();
+
+        if ($entry->slug === null || $entry->siteId === $primarySite->id) {
+            return null;
+        }
+
+        // Et upublisert utkast har ingen kanonisk entry å sammenligne med,
+        // så da sammenlignes utkastet med seg selv på primærsiten.
+        $primary = Entry::find()
+            ->id($entry->getIsUnpublishedDraft() ? $entry->id : $entry->getCanonicalId())
+            ->siteId($primarySite->id)
+            ->drafts(null)
+            ->status(null)
+            ->one();
+
+        if ($primary === null || $primary->slug !== $entry->slug) {
+            return null;
+        }
+
+        return sprintf(
+            'The slug "%s" is the same as on the primary site. Slugs are per site: if this is a translation, set a slug in this language with update_entry (slug). Ignore this if the slug is meant to be identical. Changing a slug does not redirect the old URL.',
+            $entry->slug,
+        );
     }
 }
