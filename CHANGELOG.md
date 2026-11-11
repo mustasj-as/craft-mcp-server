@@ -10,6 +10,16 @@ er en del av det offentlige API-et.
   objektet til en array, og skjemaet krever `object`. Funnet ved røyktest
   2026-11-10; utelatt `fields` virker.
 
+## 1.6.1 — 2026-11-11
+
+### Rettet
+
+- **Nye kladder fra `create_entry` vises i kontrollpanelet.** Kladden ble
+  lagret med `markAsSaved: false`, så `drafts.saved` ble 0 og Craft skjulte
+  den i entry-oversikten, også under filteret «Utkast». Redaktørene fant den
+  bare via `cpEditUrl`. Nå lagres den som en vanlig lagret kladd, og
+  `note`-teksten sier ikke lenger at den bare finnes via filteret.
+
 ## 1.6.0 — 2026-11-10
 
 ### Lagt til

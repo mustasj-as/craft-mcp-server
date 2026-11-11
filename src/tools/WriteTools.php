@@ -89,7 +89,7 @@ class WriteTools
             throw new ToolCallException(sprintf('The API token user is not allowed to create entries in section "%s".', $section));
         }
 
-        if (!Craft::$app->getDrafts()->saveElementAsDraft($entry, $user->id, markAsSaved: false)) {
+        if (!Craft::$app->getDrafts()->saveElementAsDraft($entry, $user->id, markAsSaved: true)) {
             throw new ToolCallException('Could not save draft: ' . $this->_formatErrors($entry));
         }
 
@@ -406,7 +406,7 @@ class WriteTools
             'title' => $draft->title,
             'cpEditUrl' => $draft->getCpEditUrl(),
             'note' => $draft->getIsUnpublishedDraft()
-                ? 'Draft saved. Call publish_draft with draftId to make it live. Read it back with get_entry (draftId), change it with update_entry (draftId). In the control panel, new drafts only appear in the entry list when the "Drafts" status filter is selected — or open cpEditUrl directly.'
+                ? 'Draft saved. Call publish_draft with draftId to make it live. Read it back with get_entry (draftId), change it with update_entry (draftId). Editors find it in the control panel entry list (status "Draft"), or via cpEditUrl.'
                 : 'Draft saved. Call publish_draft with draftId to make it live, or review it in the control panel via cpEditUrl.',
         ];
 
